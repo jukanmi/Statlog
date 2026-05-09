@@ -1,23 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
+from AI_routers.ai_service import AIService
+from AI_routers.ai_log import StatResponse
+
 
 app = FastAPI()
 
 # --- 데이터 모델 (프론트 명세서 기반) ---
 
-class Stats(BaseModel):
-    INT: int = 0
-    STR: int = 0
-    END: int = 0
-    AGI: int = 0
-    CHA: int = 0
+# 스탯클래스 /AI_routers/ai_log.py로 이동
 
 class User(BaseModel):
     id: str
     nickname: str
     profile_image: Optional[str] = None
-    stats: Stats
+    stats: StatResponse
     gold: int
     gems: int
     level: int
@@ -48,12 +46,9 @@ class StudySessionRequest(BaseModel):
 
 @app.post("/api/v1/study/sessions", status_code=201)
 async def save_study_session(session: StudySessionRequest):
-    # 여기서 나중에 GCP AI 서버로 content를 보내서 스탯을 계산할 거예요!
-    # 지금은 성공했다는 메시지만 보냅니다.
-    print(f"받은 공부 내용: {session.content}")
-    
+    stat_gained = await AIService.request_stat_conversion(session.content)
     return {
         "id": "session-123",
         "subject": session.subject,
-        "stat_gained": {"INT": 5, "END": 2} # 가짜 보상 데이터
+        "stat_gained": stat_gained
     }
