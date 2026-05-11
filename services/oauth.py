@@ -7,6 +7,30 @@ import httpx
 from app.core.config import settings
 
 
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    """
+    모듈 전역 httpx.AsyncClient 재사용
+
+    매 요청마다 새 AsyncClient를 생성하면 커넥션 풀/TLS 핸드셰이크가
+    낭비된다. 애플리케이션 lifespan에서 close_http_client()로 정리할 것.
+    """
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=10.0)
+    return _http_client
+
+
+async def close_http_client() -> None:
+    """애플리케이션 shutdown 시 호출"""
+    global _http_client
+    if _http_client is not None and not _http_client.is_closed:
+        await _http_client.aclose()
+        _http_client = None
+
+
 Provider = Literal["kakao", "google"]
 
 
@@ -83,14 +107,14 @@ async def exchange_code_for_token(
         if settings.KAKAO_CLIENT_SECRET:
             data["client_secret"] = settings.KAKAO_CLIENT_SECRET
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://kauth.kakao.com/oauth/token",
-                data=data,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
-                },
-            )
+        client = get_http_client()
+        response = await client.post(
+            "https://kauth.kakao.com/oauth/token",
+            data=data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+            },
+        )
 
         response.raise_for_status()
         return response.json()
@@ -104,12 +128,12 @@ async def exchange_code_for_token(
             "code": code,
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://oauth2.googleapis.com/token",
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+        client = get_http_client()
+        response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
 
         response.raise_for_status()
         return response.json()
@@ -123,11 +147,11 @@ async def fetch_oauth_user(provider: Provider, access_token: str) -> OAuthUser:
     """
 
     if provider == "kakao":
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://kapi.kakao.com/v2/user/me",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
+        client = get_http_client()
+        response = await client.get(
+            "https://kapi.kakao.com/v2/user/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
 
         response.raise_for_status()
         data = response.json()
@@ -144,11 +168,11 @@ async def fetch_oauth_user(provider: Provider, access_token: str) -> OAuthUser:
         )
 
     if provider == "google":
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://openidconnect.googleapis.com/v1/userinfo",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
+        client = get_http_client()
+        response = await client.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
 
         response.raise_for_status()
         data = response.json()

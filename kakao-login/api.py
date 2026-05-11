@@ -5,8 +5,8 @@ from flask import Flask, render_template, redirect, request, session
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-client_id = "3e6319aec44be954208ef64d6e377e2f"      # 내 앱의 REST API 키로 변경 필수
-client_secret = " this is client secret key "
+client_id = os.environ["KAKAO_CLIENT_ID"]            # 카카오 REST API 키 (env에서 로드)
+client_secret = os.environ.get("KAKAO_CLIENT_SECRET", "")
 domain = "http://localhost:4000"
 redirect_uri = domain + "/redirect"
 kauth_host = "https://kauth.kakao.com" # 액세스 토큰 요청을 보낼 카카오 인증 서버 주소

@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from schemas.user import UserResponse
+
 
 class OAuthUrlResponse(BaseModel):
     auth_url: str
@@ -17,7 +19,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     is_new_user: bool
-    user: dict
+    user: UserResponse
 
 
 class RefreshRequest(BaseModel):

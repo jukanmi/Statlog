@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -5,9 +7,18 @@ from AI_routers.ai_service import AIService
 from AI_routers.ai_log import StatResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import auth, users
+from app.services.oauth import close_http_client
 
 
-app = FastAPI(title="Study Quest API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    yield
+    # shutdown
+    await close_http_client()
+
+
+app = FastAPI(title="Study Quest API", lifespan=lifespan)
 
 # 프론트엔드 로컬 개발 주소 허용
 app.add_middleware(
