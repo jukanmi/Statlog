@@ -192,7 +192,7 @@ export const useUserStore = create<UserState>()(
     }),
   claimAttendance: () => {
     const reward: AttendanceReward = { gold: 100, gems: 1 };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA');
     set((state) => ({
       lastAttendanceDate: today,
       user: {
