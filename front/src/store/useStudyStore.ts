@@ -69,7 +69,7 @@ export const useStudyStore = create<StudyState>()(
         set({ timerState: 'idle', startedAt: null, accumulatedSeconds: 0 }),
       checkDayReset: () =>
         set((state) => {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = new Date().toLocaleDateString('sv-SE');
           if (state.todayDate !== null && state.todayDate !== today) {
             return { todayMinutes: 0, todayDate: today, timerState: 'idle', startedAt: null, accumulatedSeconds: 0 };
           }
