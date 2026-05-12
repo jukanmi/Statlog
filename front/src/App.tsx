@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
-import BottomTabBar from './components/BottomTabBar';
+import BottomTabBar, { type Tab } from './components/BottomTabBar';
 import PlaceholderPage from './components/PlaceholderPage';
 import HomePage from './pages/home/HomePage';
 import PokedexPage from './pages/pokedex/PokedexPage';
