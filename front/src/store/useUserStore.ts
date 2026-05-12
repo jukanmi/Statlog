@@ -152,7 +152,7 @@ export const useUserStore = create<UserState>()(
     set((state) => {
       const newParty: Party = {
         ...p,
-        id: `p${Date.now()}`,
+        id: `p${crypto.randomUUID()}`,
         isJoined: true,
         memberCount: 1,
       };
@@ -192,7 +192,7 @@ export const useUserStore = create<UserState>()(
     }),
   claimAttendance: () => {
     const reward: AttendanceReward = { gold: 100, gems: 1 };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA');
     set((state) => ({
       lastAttendanceDate: today,
       user: {

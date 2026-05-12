@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
-import BottomTabBar from './components/BottomTabBar';
+import BottomTabBar, { type Tab } from './components/BottomTabBar';
 import PlaceholderPage from './components/PlaceholderPage';
 import HomePage from './pages/home/HomePage';
 import PokedexPage from './pages/pokedex/PokedexPage';
@@ -30,7 +30,7 @@ const App: React.FC = () => {
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA');
     if (lastAttendanceDate !== today) {
       setShowAttendance(true);
     }
