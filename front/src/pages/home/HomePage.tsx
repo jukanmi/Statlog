@@ -14,7 +14,6 @@ import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/Pomodor
 import TimerActionButtons from './components/TimerActionButtons';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
-type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
 const HomePage: React.FC = () => {
   const todayMinutes = useStudyStore((s) => s.todayMinutes);
