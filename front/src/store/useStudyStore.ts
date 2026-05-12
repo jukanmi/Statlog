@@ -84,7 +84,9 @@ export const useStudyStore = create<StudyState>()(
         todayMinutes: state.todayMinutes,
         currentSubject: state.currentSubject,
         currentContent: state.currentContent,
-        accumulatedSeconds: state.accumulatedSeconds,
+        accumulatedSeconds: state.timerState === 'studying' && state.startedAt
+          ? Math.floor((Date.now() - state.startedAt) / 1000)
+          : state.accumulatedSeconds,
         timerState: state.timerState === 'studying' ? 'paused' : state.timerState,
         startedAt: null,
       }),
