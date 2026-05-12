@@ -43,7 +43,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
   const handleSave = () => {
     const session: StudySession = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       subject,
       content,
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
