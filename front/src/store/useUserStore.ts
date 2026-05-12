@@ -152,7 +152,7 @@ export const useUserStore = create<UserState>()(
     set((state) => {
       const newParty: Party = {
         ...p,
-        id: `p${Date.now()}`,
+        id: `p${crypto.randomUUID()}`,
         isJoined: true,
         memberCount: 1,
       };
