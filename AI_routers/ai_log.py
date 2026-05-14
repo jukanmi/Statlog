@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from AI_routers.ai_config import settings
-from AI_routers.ai_service import AIService, StatResponse
+from AI_routers.ai_service import AIService, QuizPayload, StatResponse
 
 router = APIRouter(prefix="/ai", tags=["AI 학습 패턴 및 스탯 변환"])
 
@@ -69,6 +69,16 @@ async def analyze_log_to_stats(log_text: str, duration_minutes: int) -> StatResp
 async def convert_log_to_stat(request: LogRequest):
     """자연어 학습 로그를 스탯/EXP로 변환한다."""
     return await analyze_log_to_stats(request.log_text, request.duration_minutes)
+
+
+class QuizRequest(BaseModel):
+    content: str  # 사용자가 입력한 학습 내용
+
+
+@router.post("/quiz", response_model=QuizPayload)
+async def generate_quiz(request: QuizRequest):
+    """사용자의 학습 내용을 바탕으로 4지선다 복습 퀴즈를 AI로 생성한다."""
+    return await AIService.request_quiz_generation(request.content)
 
 
 class StatDebugResponse(BaseModel):

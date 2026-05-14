@@ -192,6 +192,7 @@ const HomePage: React.FC = () => {
     return (
       <QuizScreen
         subject={currentSubject || '기타'}
+        content={currentContent}
         onComplete={handleQuizComplete}
         onSkip={handleQuizSkip}
       />
