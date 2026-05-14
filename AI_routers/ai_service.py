@@ -129,7 +129,7 @@ class AIService:
                     last_body = response.text
                     # LLM 응답을 고정 스키마로 검증 — 실패 시 ValidationError
                     return model_cls.model_validate(response.json())
-                except httpx.HTTPError as exc:
+                except (httpx.HTTPError, ValueError) as exc:
                     last_error = exc
                     logger.warning(
                         "%s 연동 실패 (%d/%d) [%s]: %s: %s",

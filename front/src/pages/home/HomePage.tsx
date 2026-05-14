@@ -78,7 +78,7 @@ const HomePage: React.FC = () => {
         subject: currentSubject || '기타',
         content: currentContent,
         durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toLocaleDateString('en-CA'),
       });
       setStatGained(result);
     } catch (e) {
