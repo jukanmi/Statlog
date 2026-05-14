@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     await close_http_client()
 
 
-app = FastAPI(title="Study Quest API", lifespan=lifespan)
+app = FastAPI(title="Statlog API", lifespan=lifespan)
 
 # 프론트엔드 로컬 개발 주소 허용
 app.add_middleware(
