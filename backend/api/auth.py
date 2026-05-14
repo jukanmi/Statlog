@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.config import settings
-from app.core.security import (
+from core.security import (
     create_access_token,
     create_refresh_token,
     create_oauth_state,
