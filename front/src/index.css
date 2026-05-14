@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 233 33% 8%;
+    --foreground: 48 33% 93%;
+
+    --card: 233 33% 14%;
+    --card-foreground: 48 33% 93%;
+
+    --popover: 233 33% 14%;
+    --popover-foreground: 48 33% 93%;
+
+    --primary: 43 52% 54%;
+    --primary-foreground: 233 33% 8%;
+
+    --secondary: 263 84% 58%;
+    --secondary-foreground: 48 33% 93%;
+
+    --muted: 233 33% 14%;
+    --muted-foreground: 231 12% 60%;
+
+    --accent: 263 84% 58%;
+    --accent-foreground: 48 33% 93%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 48 33% 93%;
+
+    --border: 0 0% 100% / 0.08;
+    --input: 0 0% 100% / 0.08;
+    --ring: 43 52% 54%;
+
+    --radius: 0.75rem;
+
+    --surface: 233 33% 14%;
+    --card-border: 0 0% 100% / 0.08;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
