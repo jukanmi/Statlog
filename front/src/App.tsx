@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
+import AuthCallback from './pages/auth/AuthCallback';
 import BottomTabBar, { type Tab } from './components/BottomTabBar';
 import PlaceholderPage from './components/PlaceholderPage';
 import HomePage from './pages/home/HomePage';
@@ -36,8 +37,23 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleAuthSuccess = () => handleLogin();
+    window.addEventListener('auth_success', handleAuthSuccess);
+    return () => window.removeEventListener('auth_success', handleAuthSuccess);
+  }, []);
+
   if (!isAuthenticated) {
-    return <AuthScreen onLogin={handleLogin} />;
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-[430px] mx-auto">
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<AuthScreen onLogin={handleLogin} />} />
+          </Routes>
+        </div>
+      </div>
+    );
   }
 
   return (

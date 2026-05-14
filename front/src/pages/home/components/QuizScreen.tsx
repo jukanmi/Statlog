@@ -20,16 +20,24 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
   const correctAtSelect = useRef(0);
 
   const quiz = quizzes[currentIndex];
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (selectedIndex === null) return;
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
-    const isCorrect = selectedIndex === quiz.correctIndex;
+  const handleSelect = (optionIndex: number) => {
+    if (selectedIndex !== null || advancing) return;
+    setSelectedIndex(optionIndex);
+
+    const isCorrect = optionIndex === quiz.correctIndex;
     const newCount = correctAtSelect.current + (isCorrect ? 1 : 0);
     if (isCorrect) setCorrectCount(newCount);
     setAdvancing(true);
 
-    const t = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       if (currentIndex < TOTAL - 1) {
         correctAtSelect.current = newCount;
         setCurrentIndex((p) => p + 1);
@@ -39,18 +47,16 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
         onComplete(newCount);
       }
     }, 800);
-
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIndex]);
-
-  const handleSelect = (optionIndex: number) => {
-    if (selectedIndex !== null || advancing) return;
-    setSelectedIndex(optionIndex);
   };
 
   const handleNext = () => {
     if (selectedIndex === null) return;
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     if (currentIndex < TOTAL - 1) {
       correctAtSelect.current = correctCount;
       setCurrentIndex((p) => p + 1);
