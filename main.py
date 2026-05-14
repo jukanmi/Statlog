@@ -3,8 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
-from AI_routers.ai_service import AIService
-from AI_routers.ai_log import StatResponse
+from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
 from fastapi.middleware.cors import CORSMiddleware
 from api import auth, users
 from services.oauth import close_http_client
@@ -26,6 +25,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://localhost:8080",  # Vite 개발 서버 (vite.config.ts의 server.port)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -34,6 +34,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
 
 
 @app.get("/health")
@@ -79,7 +80,7 @@ class StudySessionRequest(BaseModel):
 
 @app.post("/api/v1/study/sessions", status_code=201)
 async def save_study_session(session: StudySessionRequest):
-    stat_gained = await AIService.request_stat_conversion(session.content)
+    stat_gained = await analyze_log_to_stats(session.content, session.duration_minutes)
     return {
         "id": "session-123",
         "subject": session.subject,

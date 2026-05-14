@@ -1,9 +1,11 @@
+// 백엔드 AI(StatResponse)와 동일한 6대 능력치 체계
 export interface Stats {
-  INT: number;
-  STR: number;
-  END: number;
-  AGI: number;
-  CHA: number;
+  HUM: number; // 인문학 (Humanities)
+  SOC: number; // 사회과학 (Social Sciences)
+  NAT: number; // 자연과학 (Natural Sciences)
+  COL: number; // 협동력 (Collaboration)
+  PER: number; // 끈기 (Perseverance)
+  ART: number; // 예체능 (Arts & Physical Education)
 }
 
 export interface User {
@@ -24,6 +26,7 @@ export interface StudySession {
   durationMinutes: number;
   date: string;
   statGained: Partial<Stats>;
+  expGained?: number;
 }
 
 export interface Character {

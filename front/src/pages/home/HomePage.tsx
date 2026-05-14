@@ -12,12 +12,14 @@ import TimerModeToggle, { type TimerMode } from './components/TimerModeToggle';
 import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
+import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
 const HomePage: React.FC = () => {
   const todayMinutes = useStudyStore((s) => s.todayMinutes);
   const currentSubject = useStudyStore((s) => s.currentSubject);
+  const currentContent = useStudyStore((s) => s.currentContent);
 
   // --- Pomodoro state ---
   const [timerMode, setTimerMode] = useState<TimerMode>('normal');
@@ -60,6 +62,31 @@ const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+
+  // --- AI 스탯 변환 상태 ---
+  const [statGained, setStatGained] = useState<StatConversionResult | null>(null);
+  const [statLoading, setStatLoading] = useState(false);
+  const [statError, setStatError] = useState<string | null>(null);
+
+  // 퀴즈를 맞췄을 때 백엔드 AI에 학습 내용을 보내 stat_gained를 받아온다
+  const fetchStatGained = async (elapsedSeconds: number) => {
+    setStatLoading(true);
+    setStatError(null);
+    setStatGained(null);
+    try {
+      const result = await convertStudyToStats({
+        subject: currentSubject || '기타',
+        content: currentContent,
+        durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+        date: new Date().toISOString().split('T')[0],
+      });
+      setStatGained(result);
+    } catch (e) {
+      setStatError(e instanceof Error ? e.message : '스탯 변환에 실패했어요');
+    } finally {
+      setStatLoading(false);
+    }
+  };
 
   const todayFormatted = (() => {
     const h = Math.floor(todayMinutes / 60);
@@ -113,11 +140,19 @@ const HomePage: React.FC = () => {
   const handleQuizComplete = (correctCount: number) => {
     setQuizCorrectCount(correctCount);
     setScreen('result');
+    // 퀴즈를 하나라도 맞췄을 때만 AI 스탯 변환을 요청한다
+    if (correctCount > 0) {
+      void fetchStatGained(savedElapsedSeconds);
+    }
   };
 
   const handleQuizSkip = () => setScreen('stat');
   const handleResultContinue = () => setScreen('stat');
-  const handleStatDone = () => setScreen('timer');
+  const handleStatDone = () => {
+    setScreen('timer');
+    setStatGained(null);
+    setStatError(null);
+  };
 
   // Pomodoro notice actions
   const handlePomodoroBreakStart = () => {
@@ -176,6 +211,9 @@ const HomePage: React.FC = () => {
       <StatUpdateScreen
         subject={currentSubject || '기타'}
         elapsedSeconds={savedElapsedSeconds}
+        statGained={statGained}
+        loading={statLoading}
+        error={statError}
         onDone={handleStatDone}
       />
     );
