@@ -82,6 +82,8 @@ interface UserState {
   lastQuestDate: string | null;
   claimDailyQuest: (questId: string, reward: { gold: number; gems: number }) => void;
   checkQuestReset: () => void;
+  dataCollectionConsent: boolean | null;
+  setConsent: (consent: boolean) => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -97,6 +99,7 @@ export const useUserStore = create<UserState>()(
   dailyStudyGoalSubject: '자유 학습',
   dailyQuestStatus: {},
   lastQuestDate: null,
+  dataCollectionConsent: null,
   user: {
     id: 'user-001',
     nickname: '탐험가',
@@ -247,6 +250,7 @@ export const useUserStore = create<UserState>()(
       return {};
     });
   },
+  setConsent: (consent) => set({ dataCollectionConsent: consent }),
     }),
     { name: 'user-store' }
   )

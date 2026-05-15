@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 from AI_routers.ai_service import AIService
 from AI_routers.ai_log import StatResponse
 from fastapi.middleware.cors import CORSMiddleware
-from api import auth, users
+from api import auth, users, analytics
 from services.oauth import close_http_client
 
 
@@ -34,6 +34,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 
 
 @app.get("/health")

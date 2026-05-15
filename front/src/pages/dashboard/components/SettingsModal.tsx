@@ -10,7 +10,7 @@ interface SettingsModalProps {
 type ConfirmType = 'logout' | 'delete' | null;
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
-  const { user, updateNickname, updateProfileImage, dailyStudyGoalMinutes, updateDailyStudyGoal } = useUserStore();
+  const { user, updateNickname, updateProfileImage, dailyStudyGoalMinutes, updateDailyStudyGoal, dataCollectionConsent, setConsent } = useUserStore();
   const [editingNick, setEditingNick] = useState(false);
   const [nickValue, setNickValue] = useState(user.nickname);
   const [editingGoal, setEditingGoal] = useState(false);
@@ -279,6 +279,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
           ) : (
             <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
           )}
+        </SettingRow>
+
+        {/* ─── 개인정보 ─── */}
+        <SectionHeader text="개인정보" />
+
+        <SettingRow>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: 15 }}>익명 데이터 수집 동의</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+              앱 개선을 위한 학습 통계(과목, 시간) 수집에 동의합니다.
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={dataCollectionConsent || false}
+              onChange={(e) => setConsent(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: '#C9A84C' }}
+            />
+          </label>
         </SettingRow>
 
         {/* ─── 계정 ─── */}

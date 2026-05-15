@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { StudySession } from '@/types';
+import { useUserStore } from './useUserStore';
 
 type TimerState = 'idle' | 'studying' | 'paused';
 
@@ -35,13 +36,26 @@ export const useStudyStore = create<StudyState>()(
       startedAt: null,
       accumulatedSeconds: 0,
       addSession: (session) =>
-        set((state) => ({
-          sessions: [...state.sessions, session],
-          todayMinutes: state.todayMinutes + session.durationMinutes,
-          todayDate: session.date,
-          currentSubject: session.subject,
-          currentContent: session.content,
-        })),
+        set((state) => {
+          if (useUserStore.getState().dataCollectionConsent) {
+            fetch(import.meta.env.VITE_API_URL + '/analytics/study-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                duration_minutes: session.durationMinutes,
+                subject: session.subject,
+                timestamp: new Date().toISOString(),
+              })
+            }).catch(err => console.error('Failed to send anonymous analytics:', err));
+          }
+          return {
+            sessions: [...state.sessions, session],
+            todayMinutes: state.todayMinutes + session.durationMinutes,
+            todayDate: session.date,
+            currentSubject: session.subject,
+            currentContent: session.content,
+          };
+        }),
       clearSessions: () =>
         set({ sessions: [], todayMinutes: 0, currentSubject: '', currentContent: '' }),
       startTimer: () =>
