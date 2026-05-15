@@ -1,32 +1,107 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { getQuizBySubject, type Quiz } from '@/lib/generateQuiz';
+import { generateQuiz, type Quiz } from '@/lib/api';
 
 interface QuizScreenProps {
   subject: string;
+  content: string; // 사용자가 입력한 학습 내용 — AI 퀴즈 생성의 입력
   onComplete: (correctCount: number) => void;
   onSkip: () => void;
 }
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
-const TOTAL = 3;
 
-const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) => {
-  const [quizzes] = useState<Quiz[]>(() => getQuizBySubject(subject));
+// 로딩/에러 화면 공통 컨테이너
+const screenStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 100,
+  backgroundColor: '#0F0F1A',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 32px',
+  maxWidth: 430,
+  margin: '0 auto',
+  textAlign: 'center',
+};
+
+const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, onSkip }) => {
+  const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const correctAtSelect = useRef(0);
-
-  const quiz = quizzes[currentIndex];
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 학습 내용을 바탕으로 AI 퀴즈 생성
+  useEffect(() => {
+    let cancelled = false;
+    setQuizzes(null);
+    setLoadError(null);
+    generateQuiz(content)
+      .then((q) => {
+        if (cancelled) return;
+        if (q.length === 0) setLoadError('생성된 퀴즈가 없습니다');
+        else setQuizzes(q);
+      })
+      .catch((e) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : '퀴즈 생성에 실패했어요');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [content]);
+
+  // 퀴즈 생성 실패 시: 에러를 잠시 보여준 뒤 자동으로 스킵
+  useEffect(() => {
+    if (!loadError) return;
+    const t = setTimeout(onSkip, 2200);
+    return () => clearTimeout(t);
+  }, [loadError, onSkip]);
 
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  // --- 에러: 잠시 표시 후 자동 스킵 ---
+  if (loadError) {
+    return (
+      <div style={screenStyle}>
+        <div style={{ fontSize: 44, marginBottom: 16 }}>⚠️</div>
+        <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0 }}>
+          퀴즈를 만들지 못했어요
+        </p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+          {loadError} · 잠시 후 다음 단계로 넘어갑니다
+        </p>
+      </div>
+    );
+  }
+
+  // --- 로딩: AI 퀴즈 생성 중 ---
+  if (!quizzes) {
+    return (
+      <div style={screenStyle}>
+        <div style={{ fontSize: 44, marginBottom: 16 }}>🧩</div>
+        <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0 }}>
+          AI가 복습 퀴즈를 만들고 있어요...
+        </p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+          잠시만 기다려 주세요
+        </p>
+      </div>
+    );
+  }
+
+  // 여기서부터 quizzes 보장됨
+  const TOTAL = quizzes.length;
+  const quiz = quizzes[currentIndex];
 
   const handleSelect = (optionIndex: number) => {
     if (selectedIndex !== null || advancing) return;
@@ -51,7 +126,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
 
   const handleNext = () => {
     if (selectedIndex === null) return;
-    
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;

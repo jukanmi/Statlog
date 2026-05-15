@@ -8,13 +8,13 @@ interface CharacterDetailModalProps {
 }
 
 const SUBJECT_STAT_BOOST: Record<string, string[]> = {
-  수학: ['INT +2', 'END +1'],
-  과학: ['INT +2', 'END +1'],
-  프로그래밍: ['INT +2', 'END +1'],
-  영어: ['CHA +2', 'INT +1', 'END +1'],
-  국어: ['CHA +2', 'INT +1', 'END +1'],
-  사회: ['CHA +1', 'INT +1', 'END +1'],
-  기타: ['INT +1', 'END +1'],
+  수학: ['NAT +2', 'PER +1'],
+  과학: ['NAT +2', 'PER +1'],
+  프로그래밍: ['NAT +2', 'COL +1'],
+  영어: ['HUM +2', 'SOC +1'],
+  국어: ['HUM +2', 'ART +1'],
+  사회: ['SOC +2', 'HUM +1'],
+  기타: ['PER +1', 'COL +1'],
 };
 
 const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({
