@@ -13,7 +13,7 @@ const AuthCallback = () => {
     const provider = localStorage.getItem('oauth_provider') || 'kakao';
 
     if (code) {
-      fetch(`http://localhost:8000/auth/${provider}/callback`, {
+      fetch(import.meta.env.VITE_API_URL + "/auth/" + provider + "/callback", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -72,8 +72,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
             updateProfileImage(compressedBase64);
           }
         };
+        img.onerror = () => {
+          alert('이미지 파일을 불러올 수 없습니다. 다른 파일을 선택해주세요.');
+        };
         img.src = result;
       }
+    };
+    reader.onerror = () => {
+      alert('파일을 읽는 중 오류가 발생했습니다.');
     };
     reader.readAsDataURL(file);
   };

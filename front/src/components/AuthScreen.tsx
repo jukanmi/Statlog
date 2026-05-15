@@ -7,12 +7,12 @@ interface AuthScreenProps {
 const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const handleKakaoLogin = () => {
     localStorage.setItem('oauth_provider', 'kakao');
-    window.location.href = 'http://localhost:8000/auth/kakao/url?redirect_uri=' + encodeURIComponent(window.location.origin + '/auth/callback');
+    window.location.href = import.meta.env.VITE_API_URL + "/auth/kakao/url?redirect_uri=" + encodeURIComponent(window.location.origin + "/auth/callback");
   };
 
   const handleGoogleLogin = () => {
     localStorage.setItem('oauth_provider', 'google');
-    window.location.href = 'http://localhost:8000/auth/google/url?redirect_uri=' + encodeURIComponent(window.location.origin + '/auth/callback');
+    window.location.href = import.meta.env.VITE_API_URL + "/auth/google/url?redirect_uri=" + encodeURIComponent(window.location.origin + "/auth/callback");
   };
 
   return (
