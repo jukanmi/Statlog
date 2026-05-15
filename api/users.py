@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.security import decode_access_token
-from app.schemas.user import serialize_user
+from core.security import decode_access_token
+from schemas.user import serialize_user
 
 
 router = APIRouter(prefix="/users", tags=["Users"])

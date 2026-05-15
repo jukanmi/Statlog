@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useStudyTimer, getPomodoroPhaseSeconds } from '@/hooks/useStudyTimer';
 import type { PomodoroConfig } from '@/hooks/useStudyTimer';
+import { useUserStore } from '@/store/useUserStore';
+import DailyQuestCard from '@/components/DailyQuestCard';
 import TimerRing from './components/TimerRing';
 import StudyModal from './components/StudyModal';
 import QuizScreen from './components/QuizScreen';
@@ -12,12 +14,25 @@ import TimerModeToggle, { type TimerMode } from './components/TimerModeToggle';
 import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
+import QuestGoalModal from './components/QuestGoalModal';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
 const HomePage: React.FC = () => {
   const todayMinutes = useStudyStore((s) => s.todayMinutes);
   const currentSubject = useStudyStore((s) => s.currentSubject);
+
+  // TAGS: Hook, Quest, State, Sync
+  const dailyQuestStatus = useUserStore((s) => s.dailyQuestStatus);
+  const claimDailyQuest = useUserStore((s) => s.claimDailyQuest);
+  const checkQuestReset = useUserStore((s) => s.checkQuestReset);
+  const dailyStudyGoalMinutes = useUserStore((s) => s.dailyStudyGoalMinutes);
+  const dailyStudyGoalSubject = useUserStore((s) => s.dailyStudyGoalSubject);
+  const updateDailyStudyGoal = useUserStore((s) => s.updateDailyStudyGoal);
+
+  useEffect(() => {
+    checkQuestReset();
+  }, [checkQuestReset]);
 
   // --- Pomodoro state ---
   const [timerMode, setTimerMode] = useState<TimerMode>('normal');
@@ -58,6 +73,7 @@ const HomePage: React.FC = () => {
   // --- Screen / modal state ---
   const [screen, setScreen] = useState<HomeScreen>('timer');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
 
@@ -86,6 +102,14 @@ const HomePage: React.FC = () => {
     const s = totalStudiedSeconds % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   })();
+
+  const handleEditTarget = () => {
+    setIsQuestModalOpen(true);
+  };
+
+  const handleQuestGoalSave = (minutes: number, subject: string) => {
+    updateDailyStudyGoal(minutes, subject);
+  };
 
   // --- Handlers ---
   const handleStop = () => {
@@ -236,6 +260,24 @@ const HomePage: React.FC = () => {
       {/* Top: today's study time */}
       <TodayStudyProgress formattedTime={todayFormatted} />
 
+      {/* TAGS: View, Render, Quest, Condition, Integration */}
+      {/* Daily Quest (visible during active and idle state) */}
+      {!pomNotice && (
+        <div style={{ width: '100%', maxWidth: 400, marginTop: 16, zIndex: 10 }}>
+          <DailyQuestCard
+            questId="daily_study_1h"
+            title={`[${dailyStudyGoalSubject}] ${dailyStudyGoalMinutes}분 집중하기`}
+            description={`'${dailyStudyGoalSubject}' 타이머로 ${dailyStudyGoalMinutes}분 이상 집중하세요.`}
+            currentProgress={todayMinutes}
+            targetProgress={dailyStudyGoalMinutes}
+            reward={{ gold: 50, gems: 5 }}
+            isClaimed={dailyQuestStatus['daily_study_1h']?.isClaimed || false}
+            onClaim={claimDailyQuest}
+            onEditTarget={handleEditTarget}
+          />
+        </div>
+      )}
+
       {/* Mode toggle (only when idle and not in active session) */}
       {!isActive && !pomNotice && (
         <TimerModeToggle timerMode={timerMode} onSwitchMode={switchMode} />
@@ -290,6 +332,15 @@ const HomePage: React.FC = () => {
         formattedElapsed={timerMode === 'pomodoro' ? totalStudiedFormatted : formattedTime}
         onSave={handleModalSave}
         onClose={handleModalClose}
+      />
+
+      {/* Quest Goal Setup modal */}
+      <QuestGoalModal
+        isOpen={isQuestModalOpen}
+        initialMinutes={dailyStudyGoalMinutes}
+        initialSubject={dailyStudyGoalSubject}
+        onSave={handleQuestGoalSave}
+        onClose={() => setIsQuestModalOpen(false)}
       />
     </div>
   );

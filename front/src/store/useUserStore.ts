@@ -62,6 +62,7 @@ interface UserState {
   lastAttendanceDate: string | null;  // 'YYYY-MM-DD'
   updateStats: (stats: Partial<Stats>) => void;
   updateProfileImage: (imageUrl: string | null) => void;
+  updateDailyStudyGoal: (minutes: number, subject?: string) => void;
   addStats: (delta: Partial<Stats>) => void;
   updateCurrency: (gold?: number, gems?: number) => void;
   updateNickname: (nickname: string) => void;
@@ -73,6 +74,14 @@ interface UserState {
   leaveGuild: () => void;
   createGuild: (g: Omit<Guild, 'id' | 'isJoined'>) => void;
   claimAttendance: () => AttendanceReward;
+
+  // TAGS: State, Quest, Daily, Status
+  dailyStudyGoalMinutes: number;
+  dailyStudyGoalSubject: string;
+  dailyQuestStatus: Record<string, { isClaimed: boolean }>;
+  lastQuestDate: string | null;
+  claimDailyQuest: (questId: string, reward: { gold: number; gems: number }) => void;
+  checkQuestReset: () => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -84,6 +93,10 @@ export const useUserStore = create<UserState>()(
   guilds: MOCK_GUILDS,
   currentGuildId: null,
   lastAttendanceDate: null,
+  dailyStudyGoalMinutes: 60,
+  dailyStudyGoalSubject: '자유 학습',
+  dailyQuestStatus: {},
+  lastQuestDate: null,
   user: {
     id: 'user-001',
     nickname: '탐험가',
@@ -96,6 +109,11 @@ export const useUserStore = create<UserState>()(
   },
   updateProfileImage: (imageUrl) =>
     set((state) => ({ user: { ...state.user, profileImage: imageUrl } })),
+  updateDailyStudyGoal: (minutes, subject) =>
+    set((state) => ({
+      dailyStudyGoalMinutes: minutes,
+      dailyStudyGoalSubject: subject !== undefined ? subject : state.dailyStudyGoalSubject,
+    })),
   updateStats: (stats) =>
     set((state) => ({
       user: { ...state.user, stats: { ...state.user.stats, ...stats } },
@@ -202,6 +220,32 @@ export const useUserStore = create<UserState>()(
       },
     }));
     return reward;
+  },
+
+  // TAGS: Action, Quest, Claim, Reset, Store
+  claimDailyQuest: (questId, reward) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    set((state) => ({
+      lastQuestDate: today,
+      dailyQuestStatus: {
+        ...state.dailyQuestStatus,
+        [questId]: { isClaimed: true }
+      },
+      user: {
+        ...state.user,
+        gold: state.user.gold + reward.gold,
+        gems: state.user.gems + reward.gems,
+      }
+    }));
+  },
+  checkQuestReset: () => {
+    const today = new Date().toLocaleDateString('en-CA');
+    set((state) => {
+      if (state.lastQuestDate !== today) {
+        return { lastQuestDate: today, dailyQuestStatus: {} };
+      }
+      return {};
+    });
   },
     }),
     { name: 'user-store' }

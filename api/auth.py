@@ -5,17 +5,17 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.config import settings
-from app.core.security import (
+from core.config import settings
+from core.security import (
     create_access_token,
     create_refresh_token,
     create_oauth_state,
     hash_token,
     verify_oauth_state,
 )
-from app.schemas.auth import OAuthCallbackRequest, OAuthUrlResponse, TokenResponse
-from app.schemas.user import serialize_user
-from app.services.oauth import build_oauth_url, exchange_code_for_token, fetch_oauth_user
+from schemas.auth import OAuthCallbackRequest, OAuthUrlResponse, TokenResponse
+from schemas.user import serialize_user
+from services.oauth import build_oauth_url, exchange_code_for_token, fetch_oauth_user
 
 
 logger = logging.getLogger(__name__)

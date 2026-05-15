@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from app.core.config import settings
+from core.config import settings
 
 
 _http_client: httpx.AsyncClient | None = None
