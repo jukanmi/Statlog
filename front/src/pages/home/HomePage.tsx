@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
-import { useStudyTimer, getPomodoroPhaseSeconds } from '@/hooks/useStudyTimer';
-import type { PomodoroConfig } from '@/hooks/useStudyTimer';
-import { useUserStore } from '@/store/useUserStore';
+import { useQuestStore } from '@/store/useQuestStore';
+import { usePomodoroTimer } from '@/hooks/usePomodoroTimer';
 import DailyQuestCard from '@/components/DailyQuestCard';
 import TimerRing from './components/TimerRing';
 import StudyModal from './components/StudyModal';
@@ -23,28 +22,26 @@ const HomePage: React.FC = () => {
   const currentSubject = useStudyStore((s) => s.currentSubject);
 
   // TAGS: Hook, Quest, State, Sync
-  const dailyQuestStatus = useUserStore((s) => s.dailyQuestStatus);
-  const claimDailyQuest = useUserStore((s) => s.claimDailyQuest);
-  const checkQuestReset = useUserStore((s) => s.checkQuestReset);
-  const dailyStudyGoalMinutes = useUserStore((s) => s.dailyStudyGoalMinutes);
-  const dailyStudyGoalSubject = useUserStore((s) => s.dailyStudyGoalSubject);
-  const updateDailyStudyGoal = useUserStore((s) => s.updateDailyStudyGoal);
+  const {
+    dailyQuestStatus,
+    claimDailyQuest,
+    checkQuestReset,
+    dailyStudyGoalMinutes,
+    dailyStudyGoalSubject,
+    updateDailyStudyGoal,
+  } = useQuestStore();
 
   useEffect(() => {
     checkQuestReset();
   }, [checkQuestReset]);
 
-  // --- Pomodoro state ---
-  const [timerMode, setTimerMode] = useState<TimerMode>('normal');
-  const [pomPhase, setPomPhase] = useState<PomodoroConfig['phase']>('study');
-  const [pomRound, setPomRound] = useState(1);
-  const [pomNotice, setPomNotice] = useState<PomodoroNotice>(null);
-  const [cumulativeStudySeconds, setCumulativeStudySeconds] = useState(0);
-
-  const pomodoroConfig: PomodoroConfig | undefined =
-    timerMode === 'pomodoro' ? { phase: pomPhase, round: pomRound } : undefined;
-
+  // --- Pomodoro / Timer state ---
   const {
+    timerMode,
+    pomPhase,
+    pomRound,
+    pomNotice,
+    totalStudiedSeconds,
     timerState,
     elapsedSeconds,
     formattedTime,
@@ -53,22 +50,11 @@ const HomePage: React.FC = () => {
     pauseTimer,
     stopTimer,
     resetTimer,
-  } = useStudyTimer(pomodoroConfig);
-
-  // --- Pomodoro phase completion detection ---
-  useEffect(() => {
-    if (timerMode !== 'pomodoro' || timerState !== 'studying' || pomNotice !== null) return;
-    const phaseSeconds = getPomodoroPhaseSeconds({ phase: pomPhase, round: pomRound });
-    if (elapsedSeconds >= phaseSeconds) {
-      pauseTimer();
-      if (pomPhase === 'study') {
-        setCumulativeStudySeconds((prev) => prev + phaseSeconds);
-        setPomNotice('study-done');
-      } else {
-        setPomNotice('break-done');
-      }
-    }
-  }, [elapsedSeconds, timerState, timerMode, pomPhase, pomRound, pomNotice, pauseTimer]);
+    handleBreakStart,
+    handleNextRound,
+    handlePomodoroComplete: completePomodoroSession,
+    switchMode,
+  } = usePomodoroTimer();
 
   // --- Screen / modal state ---
   const [screen, setScreen] = useState<HomeScreen>('timer');
@@ -87,15 +73,6 @@ const HomePage: React.FC = () => {
   const isStudying = timerState === 'studying';
   const isPaused = timerState === 'paused';
   const isActive = isStudying || isPaused;
-
-  // Total studied seconds (for pomodoro: cumulative + current study phase only)
-  const totalStudiedSeconds =
-    timerMode === 'pomodoro'
-      ? cumulativeStudySeconds +
-        (pomPhase === 'study'
-          ? Math.min(elapsedSeconds, getPomodoroPhaseSeconds({ phase: 'study', round: pomRound }))
-          : 0)
-      : elapsedSeconds;
 
   const totalStudiedFormatted = (() => {
     const m = Math.floor(totalStudiedSeconds / 60);
@@ -120,12 +97,13 @@ const HomePage: React.FC = () => {
   const handleModalSave = () => {
     setSavedElapsedSeconds(timerMode === 'pomodoro' ? totalStudiedSeconds : elapsedSeconds);
     setIsModalOpen(false);
-    resetTimer();
+    
     if (timerMode === 'pomodoro') {
-      setCumulativeStudySeconds(0);
-      setPomPhase('study');
-      setPomRound(1);
+      completePomodoroSession();
+    } else {
+      resetTimer();
     }
+    
     setScreen('quiz');
   };
 
@@ -143,38 +121,13 @@ const HomePage: React.FC = () => {
   const handleResultContinue = () => setScreen('stat');
   const handleStatDone = () => setScreen('timer');
 
-  // Pomodoro notice actions
-  const handlePomodoroBreakStart = () => {
-    setPomNotice(null);
-    setPomPhase('break');
-    resetTimer();
-  };
-
-  const handlePomodoroNextRound = () => {
-    setPomNotice(null);
-    setPomPhase('study');
-    setPomRound((r) => Math.min(r + 1, 4));
-    resetTimer();
-  };
-
   const handlePomodoroComplete = () => {
-    setPomNotice(null);
-    setSavedElapsedSeconds(cumulativeStudySeconds);
-    resetTimer();
-    setCumulativeStudySeconds(0);
-    setPomPhase('study');
-    setPomRound(1);
+    const saved = completePomodoroSession();
+    setSavedElapsedSeconds(saved);
     setScreen('quiz');
   };
 
-  const switchMode = (mode: TimerMode) => {
-    setTimerMode(mode);
-    resetTimer();
-    setCumulativeStudySeconds(0);
-    setPomPhase('study');
-    setPomRound(1);
-    setPomNotice(null);
-  };
+
 
   // --- Non-timer screens ---
   if (screen === 'quiz') {
@@ -307,8 +260,8 @@ const HomePage: React.FC = () => {
         <PomodoroNoticeOverlay
           pomNotice={pomNotice}
           pomRound={pomRound}
-          onBreakStart={handlePomodoroBreakStart}
-          onNextRound={handlePomodoroNextRound}
+          onBreakStart={handleBreakStart}
+          onNextRound={handleNextRound}
           onComplete={handlePomodoroComplete}
         />
       </div>

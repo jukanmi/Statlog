@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
+import { useSocialStore } from '@/store/useSocialStore';
 
 const PARTY_TAGS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'];
 const MAX_OPTIONS = [2, 3, 4, 5, 6, 8];
@@ -36,7 +37,8 @@ function Toast({ msg }: { msg: string }) {
 type View = 'list' | 'detail';
 
 const PartySubScreen: React.FC = () => {
-  const { parties, currentPartyId, user, joinParty, leaveParty, createParty } = useUserStore();
+  const { user } = useUserStore();
+  const { parties, currentPartyId, joinParty, leaveParty, createParty } = useSocialStore();
   const [view, setView] = useState<View>('list');
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
