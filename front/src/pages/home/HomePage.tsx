@@ -15,6 +15,7 @@ import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/Pomodor
 import TimerActionButtons from './components/TimerActionButtons';
 import QuestGoalModal from './components/QuestGoalModal';
 import { VerificationPopup } from './components/VerificationPopup';
+import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
@@ -159,6 +160,20 @@ const HomePage: React.FC = () => {
     setScreen('timer');
     setStatGained(null);
     setStatError(null);
+  };
+
+  // Pomodoro notice actions
+  const handlePomodoroBreakStart = () => {
+    setPomNotice(null);
+    setPomPhase('break');
+    resetTimer();
+  };
+
+  const handlePomodoroNextRound = () => {
+    setPomNotice(null);
+    setPomPhase('study');
+    setPomRound((r) => Math.min(r + 1, 4));
+    resetTimer();
   };
 
   const handlePomodoroComplete = () => {
