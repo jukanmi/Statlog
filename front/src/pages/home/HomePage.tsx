@@ -14,6 +14,7 @@ import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
 import QuestGoalModal from './components/QuestGoalModal';
+import { VerificationPopup } from './components/VerificationPopup';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
@@ -60,6 +61,7 @@ const HomePage: React.FC = () => {
   const [screen, setScreen] = useState<HomeScreen>('timer');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
 
@@ -104,7 +106,11 @@ const HomePage: React.FC = () => {
       resetTimer();
     }
     
+    if (Math.random() < 0.5) { // 50% 확률로 AI 검증 팝업 띄우기
+      setShowVerification(true);
+    } else {
     setScreen('quiz');
+    }
   };
 
   const handleModalClose = () => {
@@ -295,6 +301,19 @@ const HomePage: React.FC = () => {
         onSave={handleQuestGoalSave}
         onClose={() => setIsQuestModalOpen(false)}
       />
+
+      {showVerification && (
+        <VerificationPopup
+          onSuccess={() => {
+            setShowVerification(false);
+            setScreen('quiz');
+          }}
+          onCancel={() => {
+            setShowVerification(false);
+            resetTimer();
+          }}
+        />
+      )}
     </div>
   );
 };
