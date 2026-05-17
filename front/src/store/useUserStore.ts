@@ -14,6 +14,7 @@ interface UserState {
   updateStats: (stats: Partial<Stats>) => void;
   updateProfileImage: (imageUrl: string | null) => void;
   addStats: (delta: Partial<Stats>) => void;
+  addExp: (amount: number) => void;
   updateCurrency: (gold?: number, gems?: number) => void;
   updateNickname: (nickname: string) => void;
   addCharacter: (id: string) => void;
@@ -32,7 +33,7 @@ export const useUserStore = create<UserState>()(
         id: 'user-001',
         nickname: '탐험가',
         profileImage: null,
-        stats: { INT: 50, STR: 0, END: 10, AGI: 0, CHA: 0 },
+        stats: { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
         gold: 1200,
         gems: 30,
         level: 7,
@@ -47,19 +48,16 @@ export const useUserStore = create<UserState>()(
       addStats: (delta) =>
         set((state) => {
           const cur = state.user.stats;
-          return {
-            user: {
-              ...state.user,
-              stats: {
-                INT: cur.INT + (delta.INT ?? 0),
-                STR: cur.STR + (delta.STR ?? 0),
-                END: cur.END + (delta.END ?? 0),
-                AGI: cur.AGI + (delta.AGI ?? 0),
-                CHA: cur.CHA + (delta.CHA ?? 0),
-              },
-            },
-          };
+          const next = { ...cur };
+          (Object.keys(next) as (keyof Stats)[]).forEach((key) => {
+            next[key] = cur[key] + (delta[key] ?? 0);
+          });
+          return { user: { ...state.user, stats: next } };
         }),
+      addExp: (amount) =>
+        set((state) => ({
+          user: { ...state.user, exp: state.user.exp + amount },
+        })),
       updateCurrency: (gold, gems) =>
         set((state) => ({
           user: {
@@ -91,6 +89,21 @@ export const useUserStore = create<UserState>()(
       },
       setConsent: (consent) => set({ dataCollectionConsent: consent }),
     }),
-    { name: 'user-store' }
+    {
+      name: 'user-store',
+      // v1: 스탯 체계를 5스탯(INT/STR/END/AGI/CHA) → 6스탯(HUM/SOC/NAT/COL/PER/ART)으로 교체.
+      // 옛 구조가 저장된 localStorage를 6스탯 구조로 마이그레이션한다.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as { user?: User } | undefined;
+        if (state?.user && version < 1) {
+          state.user = {
+            ...state.user,
+            stats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0 },
+          };
+        }
+        return state as UserState;
+      },
+    }
   )
 );

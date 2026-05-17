@@ -3,8 +3,8 @@ import type { Stats } from '@/types';
 
 type StatKey = keyof Stats;
 
-const STAT_KEYS: StatKey[] = ['INT', 'STR', 'END', 'AGI', 'CHA'];
-const ANGLES = [-90, -18, 54, 126, 198]; // degrees, starting from top, 72° apart
+const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART'];
+const ANGLES = [-90, -30, 30, 90, 150, 210]; // degrees, starting from top, 60° apart
 const CENTER = 120;
 const CHART_RADIUS = 80;
 const LABEL_RADIUS = 100;
