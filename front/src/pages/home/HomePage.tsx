@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
-import { useStudyTimer, getPomodoroPhaseSeconds } from '@/hooks/useStudyTimer';
-import type { PomodoroConfig } from '@/hooks/useStudyTimer';
+import { useQuestStore } from '@/store/useQuestStore';
+import { usePomodoroTimer } from '@/hooks/usePomodoroTimer';
+import DailyQuestCard from '@/components/DailyQuestCard';
 import TimerRing from './components/TimerRing';
 import StudyModal from './components/StudyModal';
 import QuizScreen from './components/QuizScreen';
@@ -12,6 +13,8 @@ import TimerModeToggle, { type TimerMode } from './components/TimerModeToggle';
 import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
+import QuestGoalModal from './components/QuestGoalModal';
+import { VerificationPopup } from './components/VerificationPopup';
 import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
@@ -21,17 +24,27 @@ const HomePage: React.FC = () => {
   const currentSubject = useStudyStore((s) => s.currentSubject);
   const currentContent = useStudyStore((s) => s.currentContent);
 
-  // --- Pomodoro state ---
-  const [timerMode, setTimerMode] = useState<TimerMode>('normal');
-  const [pomPhase, setPomPhase] = useState<PomodoroConfig['phase']>('study');
-  const [pomRound, setPomRound] = useState(1);
-  const [pomNotice, setPomNotice] = useState<PomodoroNotice>(null);
-  const [cumulativeStudySeconds, setCumulativeStudySeconds] = useState(0);
-
-  const pomodoroConfig: PomodoroConfig | undefined =
-    timerMode === 'pomodoro' ? { phase: pomPhase, round: pomRound } : undefined;
-
+  // TAGS: Hook, Quest, State, Sync
   const {
+    dailyQuestStatus,
+    claimDailyQuest,
+    checkQuestReset,
+    dailyStudyGoalMinutes,
+    dailyStudyGoalSubject,
+    updateDailyStudyGoal,
+  } = useQuestStore();
+
+  useEffect(() => {
+    checkQuestReset();
+  }, [checkQuestReset]);
+
+  // --- Pomodoro / Timer state ---
+  const {
+    timerMode,
+    pomPhase,
+    pomRound,
+    pomNotice,
+    totalStudiedSeconds,
     timerState,
     elapsedSeconds,
     formattedTime,
@@ -40,26 +53,17 @@ const HomePage: React.FC = () => {
     pauseTimer,
     stopTimer,
     resetTimer,
-  } = useStudyTimer(pomodoroConfig);
-
-  // --- Pomodoro phase completion detection ---
-  useEffect(() => {
-    if (timerMode !== 'pomodoro' || timerState !== 'studying' || pomNotice !== null) return;
-    const phaseSeconds = getPomodoroPhaseSeconds({ phase: pomPhase, round: pomRound });
-    if (elapsedSeconds >= phaseSeconds) {
-      pauseTimer();
-      if (pomPhase === 'study') {
-        setCumulativeStudySeconds((prev) => prev + phaseSeconds);
-        setPomNotice('study-done');
-      } else {
-        setPomNotice('break-done');
-      }
-    }
-  }, [elapsedSeconds, timerState, timerMode, pomPhase, pomRound, pomNotice, pauseTimer]);
+    handleBreakStart,
+    handleNextRound,
+    handlePomodoroComplete: completePomodoroSession,
+    switchMode,
+  } = usePomodoroTimer();
 
   // --- Screen / modal state ---
   const [screen, setScreen] = useState<HomeScreen>('timer');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
 
@@ -99,20 +103,19 @@ const HomePage: React.FC = () => {
   const isPaused = timerState === 'paused';
   const isActive = isStudying || isPaused;
 
-  // Total studied seconds (for pomodoro: cumulative + current study phase only)
-  const totalStudiedSeconds =
-    timerMode === 'pomodoro'
-      ? cumulativeStudySeconds +
-        (pomPhase === 'study'
-          ? Math.min(elapsedSeconds, getPomodoroPhaseSeconds({ phase: 'study', round: pomRound }))
-          : 0)
-      : elapsedSeconds;
-
   const totalStudiedFormatted = (() => {
     const m = Math.floor(totalStudiedSeconds / 60);
     const s = totalStudiedSeconds % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   })();
+
+  const handleEditTarget = () => {
+    setIsQuestModalOpen(true);
+  };
+
+  const handleQuestGoalSave = (minutes: number, subject: string) => {
+    updateDailyStudyGoal(minutes, subject);
+  };
 
   // --- Handlers ---
   const handleStop = () => {
@@ -123,13 +126,18 @@ const HomePage: React.FC = () => {
   const handleModalSave = () => {
     setSavedElapsedSeconds(timerMode === 'pomodoro' ? totalStudiedSeconds : elapsedSeconds);
     setIsModalOpen(false);
-    resetTimer();
+    
     if (timerMode === 'pomodoro') {
-      setCumulativeStudySeconds(0);
-      setPomPhase('study');
-      setPomRound(1);
+      completePomodoroSession();
+    } else {
+      resetTimer();
     }
+    
+    if (Math.random() < 0.5) { // 50% 확률로 AI 검증 팝업 띄우기
+      setShowVerification(true);
+    } else {
     setScreen('quiz');
+    }
   };
 
   const handleModalClose = () => {
@@ -169,23 +177,12 @@ const HomePage: React.FC = () => {
   };
 
   const handlePomodoroComplete = () => {
-    setPomNotice(null);
-    setSavedElapsedSeconds(cumulativeStudySeconds);
-    resetTimer();
-    setCumulativeStudySeconds(0);
-    setPomPhase('study');
-    setPomRound(1);
+    const saved = completePomodoroSession();
+    setSavedElapsedSeconds(saved);
     setScreen('quiz');
   };
 
-  const switchMode = (mode: TimerMode) => {
-    setTimerMode(mode);
-    resetTimer();
-    setCumulativeStudySeconds(0);
-    setPomPhase('study');
-    setPomRound(1);
-    setPomNotice(null);
-  };
+
 
   // --- Non-timer screens ---
   if (screen === 'quiz') {
@@ -275,6 +272,24 @@ const HomePage: React.FC = () => {
       {/* Top: today's study time */}
       <TodayStudyProgress formattedTime={todayFormatted} />
 
+      {/* TAGS: View, Render, Quest, Condition, Integration */}
+      {/* Daily Quest (visible during active and idle state) */}
+      {!pomNotice && (
+        <div style={{ width: '100%', maxWidth: 400, marginTop: 16, zIndex: 10 }}>
+          <DailyQuestCard
+            questId="daily_study_1h"
+            title={`[${dailyStudyGoalSubject}] ${dailyStudyGoalMinutes}분 집중하기`}
+            description={`'${dailyStudyGoalSubject}' 타이머로 ${dailyStudyGoalMinutes}분 이상 집중하세요.`}
+            currentProgress={todayMinutes}
+            targetProgress={dailyStudyGoalMinutes}
+            reward={{ gold: 50, gems: 5 }}
+            isClaimed={dailyQuestStatus['daily_study_1h']?.isClaimed || false}
+            onClaim={claimDailyQuest}
+            onEditTarget={handleEditTarget}
+          />
+        </div>
+      )}
+
       {/* Mode toggle (only when idle and not in active session) */}
       {!isActive && !pomNotice && (
         <TimerModeToggle timerMode={timerMode} onSwitchMode={switchMode} />
@@ -304,8 +319,8 @@ const HomePage: React.FC = () => {
         <PomodoroNoticeOverlay
           pomNotice={pomNotice}
           pomRound={pomRound}
-          onBreakStart={handlePomodoroBreakStart}
-          onNextRound={handlePomodoroNextRound}
+          onBreakStart={handleBreakStart}
+          onNextRound={handleNextRound}
           onComplete={handlePomodoroComplete}
         />
       </div>
@@ -330,6 +345,28 @@ const HomePage: React.FC = () => {
         onSave={handleModalSave}
         onClose={handleModalClose}
       />
+
+      {/* Quest Goal Setup modal */}
+      <QuestGoalModal
+        isOpen={isQuestModalOpen}
+        initialMinutes={dailyStudyGoalMinutes}
+        initialSubject={dailyStudyGoalSubject}
+        onSave={handleQuestGoalSave}
+        onClose={() => setIsQuestModalOpen(false)}
+      />
+
+      {showVerification && (
+        <VerificationPopup
+          onSuccess={() => {
+            setShowVerification(false);
+            setScreen('quiz');
+          }}
+          onCancel={() => {
+            setShowVerification(false);
+            resetTimer();
+          }}
+        />
+      )}
     </div>
   );
 };

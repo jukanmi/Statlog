@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict
 from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
 from fastapi.middleware.cors import CORSMiddleware
-from api import auth, users
+from api import auth, users, analytics
 from services.oauth import close_http_client
 
 
@@ -34,6 +34,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 
 
@@ -64,7 +65,7 @@ async def get_my_profile():
     return {
         "id": "user-001",
         "nickname": "학습왕",
-        "stats": {"INT": 50, "STR": 10, "END": 20, "AGI": 5, "CHA": 10},
+        "stats": {"HUM": 50, "SOC": 0, "NAT": 10, "COL": 0, "PER": 0, "ART": 0},
         "gold": 1000,
         "gems": 50,
         "level": 1,

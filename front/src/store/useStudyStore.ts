@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { StudySession } from '@/types';
 
+
 type TimerState = 'idle' | 'studying' | 'paused';
 
 interface StudyState {
@@ -35,13 +36,16 @@ export const useStudyStore = create<StudyState>()(
       startedAt: null,
       accumulatedSeconds: 0,
       addSession: (session) =>
-        set((state) => ({
-          sessions: [...state.sessions, session],
-          todayMinutes: state.todayMinutes + session.durationMinutes,
-          todayDate: session.date,
-          currentSubject: session.subject,
-          currentContent: session.content,
-        })),
+        set((state) => {
+
+          return {
+            sessions: [...state.sessions, session],
+            todayMinutes: state.todayMinutes + session.durationMinutes,
+            todayDate: session.date,
+            currentSubject: session.subject,
+            currentContent: session.content,
+          };
+        }),
       clearSessions: () =>
         set({ sessions: [], todayMinutes: 0, currentSubject: '', currentContent: '' }),
       startTimer: () =>

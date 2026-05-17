@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
+import { useUserStore } from '@/store/useUserStore';
 import type { StudySession } from '@/types';
 
 interface StudyModalProps {
@@ -50,6 +51,19 @@ const StudyModal: React.FC<StudyModalProps> = ({
       date: new Date().toISOString().split('T')[0],
       statGained: {},
     };
+
+    if (useUserStore.getState().dataCollectionConsent) {
+      fetch(import.meta.env.VITE_API_URL + '/analytics/study-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          duration_minutes: session.durationMinutes,
+          subject: session.subject,
+          timestamp: new Date().toISOString(),
+        })
+      }).catch(err => console.error('Failed to send anonymous analytics:', err));
+    }
+
     addSession(session);
     setContent('');
     setSubject('수학');

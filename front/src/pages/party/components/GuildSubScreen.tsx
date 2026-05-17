@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import type { GuildMember } from '@/store/useUserStore';
+import { useSocialStore } from '@/store/useSocialStore';
+import type { GuildMember } from '@/store/useSocialStore';
 
 const MAX_OPTIONS = [10, 15, 20, 25, 30];
 
@@ -52,7 +53,8 @@ function Toast({ msg }: { msg: string }) {
 }
 
 const GuildSubScreen: React.FC = () => {
-  const { guilds, currentGuildId, user, joinGuild, leaveGuild, createGuild, updateCurrency } = useUserStore();
+  const { user, updateCurrency } = useUserStore();
+  const { guilds, currentGuildId, joinGuild, leaveGuild, createGuild } = useSocialStore();
   const [view, setView] = useState<View>('list');
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
