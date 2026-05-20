@@ -123,8 +123,8 @@ const CollectionScreen: React.FC = () => {
               onClick={() => handleCardClick(char)}
               disabled={!isOwned}
               style={{
-                backgroundColor: isOwned ? '#1A1A2E' : '#111118',
-                border: `1px solid ${isOwned ? colors.border : 'rgba(255,255,255,0.06)'}`,
+                backgroundColor: isOwned ? '#1A1A2E' : '#0E0E1A',
+                border: `1px solid ${isOwned ? colors.border : 'rgba(255,255,255,0.05)'}`,
                 borderRadius: 14,
                 padding: '12px 8px',
                 display: 'flex',
@@ -133,7 +133,6 @@ const CollectionScreen: React.FC = () => {
                 gap: 6,
                 cursor: isOwned ? 'pointer' : 'default',
                 position: 'relative',
-                filter: isOwned ? undefined : 'grayscale(1) opacity(0.4)',
                 transition: 'transform 150ms ease',
               }}
               onMouseDown={(e) => {
@@ -149,15 +148,15 @@ const CollectionScreen: React.FC = () => {
                   position: 'absolute',
                   top: 8,
                   right: 8,
-                  backgroundColor: isOwned ? colors.bg : 'rgba(255,255,255,0.06)',
-                  color: isOwned ? colors.text : 'rgba(255,255,255,0.3)',
+                  backgroundColor: isOwned ? colors.bg : 'rgba(255,255,255,0.04)',
+                  color: isOwned ? colors.text : 'rgba(255,255,255,0.2)',
                   borderRadius: 10,
                   padding: '2px 7px',
                   fontSize: 10,
                   fontWeight: 700,
                 }}
               >
-                {char.grade}
+                {isOwned ? char.grade : '?'}
               </div>
 
               {/* Avatar circle */}
@@ -168,31 +167,40 @@ const CollectionScreen: React.FC = () => {
                   borderRadius: '50%',
                   backgroundColor: isOwned
                     ? `color-mix(in srgb, ${colors.bg} 60%, transparent)`
-                    : 'rgba(255,255,255,0.04)',
+                    : 'rgba(255,255,255,0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 26,
                   marginTop: 4,
-                  border: isOwned ? `1px solid ${colors.border}30` : 'none',
+                  border: isOwned ? `1px solid ${colors.border}30` : '1px solid rgba(255,255,255,0.06)',
                   position: 'relative',
                 }}
               >
-                <span style={isOwned ? undefined : { filter: 'brightness(0) invert(1) opacity(0.35)' }}>
+                <span style={isOwned ? undefined : { filter: 'saturate(0) brightness(0.4) opacity(0.5)', userSelect: 'none' }}>
                   {icon}
                 </span>
                 {!isOwned && (
-                  <span
+                  <div
                     style={{
                       position: 'absolute',
-                      bottom: 0,
-                      right: 0,
-                      fontSize: 14,
-                      lineHeight: 1,
+                      bottom: -2,
+                      right: -2,
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(15,15,26,0.9)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 9,
+                      color: 'rgba(255,255,255,0.35)',
+                      fontWeight: 700,
                     }}
                   >
-                    🔒
-                  </span>
+                    ?
+                  </div>
                 )}
               </div>
 
@@ -201,12 +209,13 @@ const CollectionScreen: React.FC = () => {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: isOwned ? '#FFFFFF' : 'rgba(255,255,255,0.3)',
+                  color: isOwned ? '#FFFFFF' : 'rgba(255,255,255,0.2)',
                   textAlign: 'center',
                   lineHeight: 1.3,
+                  letterSpacing: isOwned ? undefined : '0.05em',
                 }}
               >
-                {isOwned ? char.name : '???'}
+                {isOwned ? char.name : '? ? ?'}
               </div>
 
               {/* Subject */}

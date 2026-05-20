@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
-import type { StudySession } from '@/types';
+import type { StudySession, StudyDepth } from '@/types';
 
 interface StudyModalProps {
   isOpen: boolean;
   elapsedSeconds: number;
   formattedElapsed: string;
-  onSave: () => void;
+  onSave: (depth: StudyDepth) => void;
   onClose: () => void;
 }
 
 const SUBJECTS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'] as const;
+
+const DEPTH_OPTIONS: { value: StudyDepth; label: string; desc: string; multiplier: string }[] = [
+  { value: 'memorize', label: '암기', desc: '내용을 외웠어요', multiplier: 'x1.0' },
+  { value: 'understand', label: '이해', desc: '개념을 이해했어요', multiplier: 'x1.2' },
+  { value: 'apply', label: '응용', desc: '응용까지 했어요', multiplier: 'x1.5' },
+];
 
 const StudyModal: React.FC<StudyModalProps> = ({
   isOpen,
@@ -23,6 +29,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
   const [visible, setVisible] = useState(false);
   const [subject, setSubject] = useState<string>('수학');
   const [content, setContent] = useState('');
+  const [depth, setDepth] = useState<StudyDepth>('understand');
   const [textareaFocused, setTextareaFocused] = useState(false);
   const addSession = useStudyStore((s) => s.addSession);
 
@@ -49,11 +56,13 @@ const StudyModal: React.FC<StudyModalProps> = ({
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
       date: new Date().toISOString().split('T')[0],
       statGained: {},
+      depth,
     };
     addSession(session);
     setContent('');
     setSubject('수학');
-    onSave();
+    setDepth('understand');
+    onSave(depth);
   };
 
   return (
@@ -143,6 +152,46 @@ const StudyModal: React.FC<StudyModalProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Depth selector */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
+            학습 깊이
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {DEPTH_OPTIONS.map((opt) => {
+              const active = depth === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setDepth(opt.value)}
+                  style={{
+                    flex: 1,
+                    height: 56,
+                    borderRadius: 12,
+                    border: active ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    backgroundColor: active ? 'rgba(201,168,76,0.12)' : '#0F0F1A',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    outline: active ? '1.5px solid rgba(201,168,76,0.5)' : 'none',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#C9A84C' : 'rgba(255,255,255,0.6)' }}>
+                    {opt.label}
+                  </span>
+                  <span style={{ fontSize: 10, color: active ? 'rgba(201,168,76,0.7)' : 'rgba(255,255,255,0.3)' }}>
+                    {opt.multiplier}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Content textarea */}

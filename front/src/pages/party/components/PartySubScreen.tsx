@@ -141,6 +141,74 @@ const PartySubScreen: React.FC = () => {
           </div>
         </div>
 
+        {/* Invite link */}
+        <div style={{ padding: '16px 20px 0' }}>
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}?join=${currentParty.id}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                showToast('초대 링크가 복사됐어요!');
+              } catch {
+                showToast('링크 복사에 실패했어요');
+              }
+            }}
+            style={{
+              width: '100%', height: 44, borderRadius: 12, cursor: 'pointer',
+              border: '1px solid rgba(167,139,250,0.3)',
+              background: 'rgba(167,139,250,0.08)', color: '#A78BFA',
+              fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <span>🔗</span>
+            <span>초대 링크 복사</span>
+          </button>
+        </div>
+
+        {/* Party quests */}
+        <div style={{ padding: '20px 20px 0' }}>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>파티 퀘스트</div>
+          {[
+            { label: '이번 주 합산 학습 1,000분', current: currentParty.weeklyMinutes, target: 1000, unit: '분' },
+            {
+              label: '파티원 각자 1시간 이상 학습',
+              current: MOCK_MEMBERS.filter((m) => m.weeklyMinutes >= 60).length,
+              target: MOCK_MEMBERS.length,
+              unit: '명',
+            },
+            { label: '5일 연속 학습 유지', current: 3, target: 5, unit: '일' },
+          ].map((quest, qi) => {
+            const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
+            const done = pct >= 100;
+            return (
+              <div
+                key={qi}
+                style={{
+                  background: done ? 'rgba(74,222,128,0.06)' : '#1A1A2E',
+                  border: `1px solid ${done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                  borderRadius: 14, padding: '14px 16px', marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ color: done ? '#4ADE80' : 'rgba(255,255,255,0.75)', fontSize: 13 }}>
+                    {done && '✓ '}{quest.label}
+                  </span>
+                  <span style={{ color: done ? '#4ADE80' : 'rgba(255,255,255,0.4)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                    {quest.current}/{quest.target}{quest.unit}
+                  </span>
+                </div>
+                <div style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${pct}%`,
+                    background: done ? '#4ADE80' : 'linear-gradient(90deg, #C9A84C, #E8CC7A)',
+                    borderRadius: 2,
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Member list */}
         <div style={{ padding: '20px 20px 0' }}>
           <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 4 }}>멤버 목록</div>

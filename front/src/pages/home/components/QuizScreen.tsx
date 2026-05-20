@@ -11,6 +11,7 @@ interface QuizScreenProps {
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 const TOTAL = 3;
+const QUIZ_TIME_LIMIT = 15;
 
 const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) => {
   const [quizzes] = useState<Quiz[]>(() => getQuizBySubject(subject));
@@ -25,8 +26,32 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
   const [shortSubmitted, setShortSubmitted] = useState(false);
   const [shortCorrect, setShortCorrect] = useState(false);
 
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(QUIZ_TIME_LIMIT);
+  const [timedOut, setTimedOut] = useState(false);
+
   const quiz = quizzes[currentIndex];
   const quizType = quiz.type ?? 'multiple';
+
+  // Reset timer on question change
+  useEffect(() => {
+    setTimeLeft(QUIZ_TIME_LIMIT);
+    setTimedOut(false);
+  }, [currentIndex]);
+
+  // Countdown
+  useEffect(() => {
+    const answered = selectedIndex !== null || shortSubmitted;
+    if (answered || advancing || timedOut) return;
+    if (timeLeft <= 0) {
+      setTimedOut(true);
+      advanceOrComplete(correctAtSelect.current);
+      return;
+    }
+    const t = setTimeout(() => setTimeLeft((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, selectedIndex, shortSubmitted, advancing, timedOut]);
 
   const advanceOrComplete = (newCount: number) => {
     setAdvancing(true);
@@ -56,7 +81,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
   }, [selectedIndex]);
 
   const handleSelect = (optionIndex: number) => {
-    if (selectedIndex !== null || advancing) return;
+    if (selectedIndex !== null || advancing || timedOut) return;
     setSelectedIndex(optionIndex);
   };
 
@@ -125,7 +150,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
       }}
     >
       {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <button
           onClick={onSkip}
           style={{
@@ -157,6 +182,29 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
         <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
           {currentIndex + 1} / {TOTAL}
         </span>
+      </div>
+
+      {/* Timer bar */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{
+          height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden',
+        }}>
+          <div style={{
+            height: '100%',
+            width: timedOut ? '0%' : `${(timeLeft / QUIZ_TIME_LIMIT) * 100}%`,
+            background: timeLeft <= 5
+              ? 'linear-gradient(90deg, #EF4444, #F87171)'
+              : 'linear-gradient(90deg, #C9A84C, #E8CC7A)',
+            borderRadius: 2,
+            transition: 'width 1s linear, background 300ms ease',
+          }} />
+        </div>
+        <div style={{
+          fontSize: 12, color: timedOut ? '#EF4444' : timeLeft <= 5 ? '#F87171' : 'rgba(255,255,255,0.35)',
+          textAlign: 'right', marginTop: 4, fontVariantNumeric: 'tabular-nums',
+        }}>
+          {timedOut ? '시간 초과' : `${timeLeft}초`}
+        </div>
       </div>
 
       {/* Question card */}

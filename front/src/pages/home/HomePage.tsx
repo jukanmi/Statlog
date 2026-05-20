@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useStudyTimer, getPomodoroPhaseSeconds } from '@/hooks/useStudyTimer';
 import type { PomodoroConfig } from '@/hooks/useStudyTimer';
+import type { StudyDepth } from '@/types';
 import TimerRing from './components/TimerRing';
 import StudyModal from './components/StudyModal';
 import QuizScreen from './components/QuizScreen';
 import ResultScreen from './components/ResultScreen';
 import StatUpdateScreen from './components/StatUpdateScreen';
+import StreakBonusModal from './components/StreakBonusModal';
 import TodayStudyProgress from './components/TodayStudyProgress';
 import TimerModeToggle, { type TimerMode } from './components/TimerModeToggle';
 import PomodoroIndicator from './components/PomodoroIndicator';
@@ -20,6 +22,8 @@ type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 const HomePage: React.FC = () => {
   const todayMinutes = useStudyStore((s) => s.todayMinutes);
   const currentSubject = useStudyStore((s) => s.currentSubject);
+  const studyStreak = useStudyStore((s) => s.studyStreak);
+  const streakBonusPending = useStudyStore((s) => s.streakBonusPending);
 
   // --- Pomodoro state ---
   const [timerMode, setTimerMode] = useState<TimerMode>('normal');
@@ -62,8 +66,10 @@ const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+  const [studyDepth, setStudyDepth] = useState<StudyDepth>('understand');
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [showQuizList, setShowQuizList] = useState(false);
+  const [showStreakBonus, setShowStreakBonus] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -103,7 +109,8 @@ const HomePage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleModalSave = () => {
+  const handleModalSave = (depth: StudyDepth) => {
+    setStudyDepth(depth);
     setSavedElapsedSeconds(timerMode === 'pomodoro' ? totalStudiedSeconds : elapsedSeconds);
     setIsModalOpen(false);
     resetTimer();
@@ -127,7 +134,10 @@ const HomePage: React.FC = () => {
 
   const handleQuizSkip = () => setScreen('stat');
   const handleResultContinue = () => setScreen('stat');
-  const handleStatDone = () => setScreen('timer');
+  const handleStatDone = () => {
+    setScreen('timer');
+    if (streakBonusPending) setShowStreakBonus(true);
+  };
 
   // Pomodoro notice actions
   const handlePomodoroBreakStart = () => {
@@ -146,6 +156,7 @@ const HomePage: React.FC = () => {
   const handlePomodoroComplete = () => {
     setPomNotice(null);
     setSavedElapsedSeconds(cumulativeStudySeconds);
+    setStudyDepth('understand');
     resetTimer();
     setCumulativeStudySeconds(0);
     setPomPhase('study');
@@ -186,6 +197,7 @@ const HomePage: React.FC = () => {
       <StatUpdateScreen
         subject={currentSubject || '기타'}
         elapsedSeconds={savedElapsedSeconds}
+        depth={studyDepth}
         onDone={handleStatDone}
       />
     );
@@ -346,9 +358,17 @@ const HomePage: React.FC = () => {
         isOpen={isModalOpen}
         elapsedSeconds={timerMode === 'pomodoro' ? totalStudiedSeconds : elapsedSeconds}
         formattedElapsed={timerMode === 'pomodoro' ? totalStudiedFormatted : formattedTime}
-        onSave={handleModalSave}
+        onSave={(depth) => handleModalSave(depth)}
         onClose={handleModalClose}
       />
+
+      {/* Streak bonus modal */}
+      {showStreakBonus && (
+        <StreakBonusModal
+          streak={studyStreak}
+          onClose={() => setShowStreakBonus(false)}
+        />
+      )}
       <QuizCreateModal
         isOpen={showQuizCreate}
         onClose={() => setShowQuizCreate(false)}

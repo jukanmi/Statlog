@@ -7,6 +7,7 @@ export interface Stats {
 }
 
 export type QuizType = 'multiple' | 'short';
+export type StudyDepth = 'memorize' | 'understand' | 'apply';
 
 export interface Quiz {
   id: string;
@@ -48,6 +49,7 @@ export interface StudySession {
   durationMinutes: number;
   date: string;
   statGained: Partial<Stats>;
+  depth?: StudyDepth;
 }
 
 export interface Character {

@@ -1,10 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats } from '@/types';
+import type { Stats, StudyDepth } from '@/types';
+
+const DEPTH_MULTIPLIERS: Record<StudyDepth, number> = {
+  memorize: 1.0,
+  understand: 1.2,
+  apply: 1.5,
+};
+
+const DEPTH_LABELS: Record<StudyDepth, string> = {
+  memorize: '암기',
+  understand: '이해',
+  apply: '응용',
+};
 
 interface StatUpdateScreenProps {
   subject: string;
   elapsedSeconds: number;
+  depth?: StudyDepth;
   onDone: () => void;
 }
 
@@ -49,21 +62,28 @@ function formatDuration(seconds: number): string {
   return `${m}분 ${s}초`;
 }
 
-const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({ subject, elapsedSeconds, onDone }) => {
+const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({ subject, elapsedSeconds, depth, onDone }) => {
   const userStats = useUserStore((s) => s.user.stats);
   const addStats = useUserStore((s) => s.addStats);
   const [animated, setAnimated] = useState(false);
   const [applied, setApplied] = useState(false);
 
-  const gains = STAT_GAINS[subject] ?? STAT_GAINS['기타'];
+  const baseGains = STAT_GAINS[subject] ?? STAT_GAINS['기타'];
+  const multiplier = depth ? DEPTH_MULTIPLIERS[depth] : 1;
 
-  const statGains: StatGain[] = (Object.entries(gains) as [StatKey, number][]).map(
-    ([key, delta]) => ({ key, delta })
+  const statGains: StatGain[] = (Object.entries(baseGains) as [StatKey, number][]).map(
+    ([key, delta]) => ({ key, delta: Math.round(delta * multiplier) })
   );
+
+  const actualGains: Partial<Stats> = Object.fromEntries(
+    statGains.map(({ key, delta }) => [key, delta])
+  ) as Partial<Stats>;
+
+  const totalPoints = statGains.reduce((sum, g) => sum + g.delta, 0);
 
   useEffect(() => {
     if (!applied) {
-      addStats(gains);
+      addStats(actualGains);
       setApplied(true);
     }
     const t = setTimeout(() => setAnimated(true), 150);
@@ -88,18 +108,72 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({ subject, elapsedSec
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 32 }}>
+      <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', margin: 0, marginBottom: 8 }}>
-          스탯이 올랐어요! ✨
+          스탯이 올랐어요!
         </h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
           {subject} · {formatDuration(elapsedSeconds)} 학습
+          {depth && (
+            <span style={{ marginLeft: 8, color: '#C9A84C', fontWeight: 600 }}>
+              [{DEPTH_LABELS[depth]} {DEPTH_MULTIPLIERS[depth] > 1 ? `x${DEPTH_MULTIPLIERS[depth]}` : ''}]
+            </span>
+          )}
         </p>
       </div>
 
+      {/* Total EXP summary */}
+      <div style={{
+        backgroundColor: 'rgba(201,168,76,0.08)',
+        border: '1px solid rgba(201,168,76,0.2)',
+        borderRadius: 14,
+        padding: '14px 18px',
+        marginBottom: 20,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>총 스탯 포인트 획득</span>
+        <span style={{ fontSize: 22, fontWeight: 700, color: '#C9A84C' }}>+{totalPoints}</span>
+      </div>
+
+      {/* Distribution bar */}
+      {statGains.length > 1 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+            {statGains.map(({ key, delta }, i) => {
+              const pct = Math.round((delta / totalPoints) * 100);
+              const colors = ['#C9A84C', '#A78BFA', '#4ADE80', '#60A5FA', '#F97316'];
+              return (
+                <div
+                  key={key}
+                  style={{
+                    width: animated ? `${pct}%` : '0%',
+                    backgroundColor: colors[i % colors.length],
+                    transition: `width 600ms ease-out ${i * 100}ms`,
+                  }}
+                />
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+            {statGains.map(({ key, delta }, i) => {
+              const pct = Math.round((delta / totalPoints) * 100);
+              const colors = ['#C9A84C', '#A78BFA', '#4ADE80', '#60A5FA', '#F97316'];
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: colors[i % colors.length] }} />
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{key} {pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stat cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
-        {statGains.map(({ key, delta }) => {
+        {statGains.map(({ key, delta }, _i) => {
           const currentValue = userStats[key];
           const targetValue = Math.min(currentValue, 100);
           const barWidth = animated ? `${targetValue}%` : '0%';
