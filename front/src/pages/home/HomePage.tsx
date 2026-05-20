@@ -12,8 +12,9 @@ import TimerModeToggle, { type TimerMode } from './components/TimerModeToggle';
 import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
+import QuizCreateModal from './components/QuizCreateModal';
+import QuizListModal from './components/QuizListModal';
 
-type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
 const HomePage: React.FC = () => {
@@ -61,6 +62,14 @@ const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+  const [showQuizCreate, setShowQuizCreate] = useState(false);
+  const [showQuizList, setShowQuizList] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
 
   const todayFormatted = (() => {
     const h = Math.floor(todayMinutes / 60);
@@ -284,6 +293,54 @@ const HomePage: React.FC = () => {
         />
       )}
 
+      {/* Quiz entry buttons — shown when idle */}
+      {!isActive && !pomNotice && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+          <button
+            onClick={() => setShowQuizCreate(true)}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(201,168,76,0.35)',
+              borderRadius: 20,
+              padding: '7px 16px',
+              color: '#C9A84C',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            + 퀴즈 만들기
+          </button>
+          <button
+            onClick={() => setShowQuizList(true)}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20,
+              padding: '7px 16px',
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            내 퀴즈
+          </button>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toastMsg && (
+        <div
+          style={{
+            position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(15,15,26,0.96)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 14, padding: '11px 22px', color: '#fff', fontSize: 14,
+            zIndex: 300, whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
+
       {/* Study modal */}
       <StudyModal
         isOpen={isModalOpen}
@@ -291,6 +348,16 @@ const HomePage: React.FC = () => {
         formattedElapsed={timerMode === 'pomodoro' ? totalStudiedFormatted : formattedTime}
         onSave={handleModalSave}
         onClose={handleModalClose}
+      />
+      <QuizCreateModal
+        isOpen={showQuizCreate}
+        onClose={() => setShowQuizCreate(false)}
+        onCreated={() => showToast('퀴즈가 추가됐어요! 다음 학습에 출제돼요')}
+      />
+
+      <QuizListModal
+        isOpen={showQuizList}
+        onClose={() => setShowQuizList(false)}
       />
     </div>
   );

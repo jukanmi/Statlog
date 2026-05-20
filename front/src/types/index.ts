@@ -6,6 +6,30 @@ export interface Stats {
   CHA: number;
 }
 
+export type QuizType = 'multiple' | 'short';
+
+export interface Quiz {
+  id: string;
+  type?: QuizType;
+  question: string;
+  options?: string[];
+  correctIndex?: number;
+  answer?: string;
+  hint?: string;
+}
+
+export interface UserQuiz {
+  id: string;
+  subject: string;
+  type: QuizType;
+  question: string;
+  options?: string[];
+  correctIndex?: number;
+  answer?: string;
+  hint?: string;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   nickname: string;
