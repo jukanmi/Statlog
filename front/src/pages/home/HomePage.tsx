@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useStudyTimer, getPomodoroPhaseSeconds } from '@/hooks/useStudyTimer';
 import type { PomodoroConfig } from '@/hooks/useStudyTimer';
@@ -16,6 +16,9 @@ import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/Pomodor
 import TimerActionButtons from './components/TimerActionButtons';
 import QuizCreateModal from './components/QuizCreateModal';
 import QuizListModal from './components/QuizListModal';
+import BurnoutWarningModal from './components/BurnoutWarningModal';
+
+const BURNOUT_THRESHOLD_MINUTES = 180; // 3시간
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
@@ -70,12 +73,22 @@ const HomePage: React.FC = () => {
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [showQuizList, setShowQuizList] = useState(false);
   const [showStreakBonus, setShowStreakBonus] = useState(false);
+  const [showBurnout, setShowBurnout] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const burnoutShownRef = useRef(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2500);
   };
+
+  // 번아웃 위험 감지
+  useEffect(() => {
+    if (!burnoutShownRef.current && todayMinutes >= BURNOUT_THRESHOLD_MINUTES) {
+      burnoutShownRef.current = true;
+      setShowBurnout(true);
+    }
+  }, [todayMinutes]);
 
   const todayFormatted = (() => {
     const h = Math.floor(todayMinutes / 60);
@@ -367,6 +380,18 @@ const HomePage: React.FC = () => {
         <StreakBonusModal
           streak={studyStreak}
           onClose={() => setShowStreakBonus(false)}
+        />
+      )}
+
+      {/* 번아웃 경고 모달 */}
+      {showBurnout && (
+        <BurnoutWarningModal
+          todayMinutes={todayMinutes}
+          onClose={() => setShowBurnout(false)}
+          onAcceptRest={() => {
+            setShowBurnout(false);
+            showToast('잘 쉬세요! 보상이 지급됐어요');
+          }}
         />
       )}
       <QuizCreateModal

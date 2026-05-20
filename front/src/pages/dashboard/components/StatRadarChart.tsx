@@ -3,12 +3,13 @@ import type { Stats } from '@/types';
 
 type StatKey = keyof Stats;
 
-const STAT_KEYS: StatKey[] = ['INT', 'STR', 'END', 'AGI', 'CHA'];
-const ANGLES = [-90, -18, 54, 126, 198]; // degrees, starting from top, 72° apart
-const CENTER = 120;
+const STAT_KEYS: StatKey[] = ['INT', 'STR', 'END', 'AGI', 'CHA', 'COP'];
+// 6축, 60° 간격, 위쪽(top)에서 시작
+const ANGLES = [-90, -30, 30, 90, 150, 210];
+const CENTER = 130;
 const CHART_RADIUS = 80;
-const LABEL_RADIUS = 100;
-const SVG_SIZE = 240;
+const LABEL_RADIUS = 104;
+const SVG_SIZE = 260;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
@@ -33,14 +34,25 @@ const getLabelDy = (angle: number): number => {
   return 4;
 };
 
+const STAT_LABELS: Record<StatKey, string> = {
+  INT: '지식력',
+  STR: '근력',
+  END: '지구력',
+  AGI: '민첩성',
+  CHA: '매력',
+  COP: '협력력',
+};
+
 const StatRadarChart: React.FC = () => {
   const { user } = useUserStore();
   const { stats } = user;
 
-  const totalPts = STAT_KEYS.reduce((sum, key) => sum + stats[key], 0);
+  const safeStat = (key: StatKey) => stats[key] ?? 0;
+
+  const totalPts = STAT_KEYS.reduce((sum, key) => sum + safeStat(key), 0);
 
   const dataPoints = STAT_KEYS.map((key, i) =>
-    getPoint(ANGLES[i], (stats[key] / 100) * CHART_RADIUS)
+    getPoint(ANGLES[i], (safeStat(key) / 100) * CHART_RADIUS)
   );
 
   const gridRings = [0.33, 0.66, 1.0];
@@ -134,7 +146,7 @@ const StatRadarChart: React.FC = () => {
                 x={labelPt.x.toFixed(2)}
                 y={labelPt.y.toFixed(2)}
                 fontSize={11}
-                fill="rgba(255,255,255,0.5)"
+                fill={key === 'COP' ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.5)'}
               >
                 <tspan
                   x={labelPt.x.toFixed(2)}
@@ -147,9 +159,18 @@ const StatRadarChart: React.FC = () => {
                   x={labelPt.x.toFixed(2)}
                   dy={13}
                   textAnchor={anchor}
-                  fill="rgba(255,255,255,0.8)"
+                  fill={key === 'COP' ? 'rgba(167,139,250,0.9)' : 'rgba(255,255,255,0.8)'}
                 >
-                  {stats[key]}
+                  {safeStat(key)}
+                </tspan>
+                <tspan
+                  x={labelPt.x.toFixed(2)}
+                  dy={12}
+                  textAnchor={anchor}
+                  fontSize={9}
+                  fill="rgba(255,255,255,0.3)"
+                >
+                  {STAT_LABELS[key]}
                 </tspan>
               </text>
             );

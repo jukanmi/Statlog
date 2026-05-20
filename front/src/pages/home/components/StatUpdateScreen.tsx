@@ -44,6 +44,7 @@ const STAT_LABELS: Record<StatKey, string> = {
   END: '지구력',
   AGI: '민첩성',
   CHA: '매력',
+  COP: '협력력',
 };
 
 const STAT_ICONS: Record<StatKey, string> = {
@@ -52,6 +53,7 @@ const STAT_ICONS: Record<StatKey, string> = {
   END: '🛡️',
   AGI: '💨',
   CHA: '✨',
+  COP: '🤝',
 };
 
 function formatDuration(seconds: number): string {

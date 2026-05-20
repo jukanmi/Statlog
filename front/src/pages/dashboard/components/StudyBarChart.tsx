@@ -15,7 +15,18 @@ const MOCK_7: DayData[] = [
   { label: '일', minutes: 30 },
 ];
 
+const MOCK_7_PREV: DayData[] = [
+  { label: '월', minutes: 90 },
+  { label: '화', minutes: 60 },
+  { label: '수', minutes: 30 },
+  { label: '목', minutes: 120 },
+  { label: '금', minutes: 80 },
+  { label: '토', minutes: 45 },
+  { label: '일', minutes: 20 },
+];
+
 const MOCK_30_RAW = [90,60,120,0,80,150,45,30,110,75,0,90,60,120,45,80,150,30,60,90,120,0,75,45,90,150,60,30,45,120];
+const MOCK_30_PREV_RAW = [70,50,100,20,60,120,30,40,90,60,10,70,50,100,30,60,120,20,50,80,100,10,60,30,70,120,50,20,30,90];
 const MOCK_30: DayData[] = MOCK_30_RAW.map((m, i) => ({
   label: ['월','화','수','목','금','토','일'][i % 7],
   minutes: m,
@@ -24,6 +35,14 @@ const MOCK_30: DayData[] = MOCK_30_RAW.map((m, i) => ({
 const TODAY_MINUTES = MOCK_7[MOCK_7.length - 1].minutes;
 const WEEK_MINUTES = MOCK_7.reduce((s, d) => s + d.minutes, 0);
 const MONTH_MINUTES = MOCK_30_RAW.reduce((s, m) => s + m, 0);
+
+const PREV_WEEK_MINUTES = MOCK_7_PREV.reduce((s, d) => s + d.minutes, 0);
+const PREV_MONTH_MINUTES = MOCK_30_PREV_RAW.reduce((s, m) => s + m, 0);
+
+function calcGrowth(current: number, prev: number): number {
+  if (prev === 0) return 0;
+  return Math.round(((current - prev) / prev) * 100);
+}
 
 const LEFT_PAD = 32;
 const RIGHT_PAD = 8;
@@ -56,6 +75,10 @@ const StudyBarChart: React.FC = () => {
   const barW = period === '7일' ? Math.min(24, slotW * 0.6) : Math.min(7, slotW * 0.75);
   const maxMin = Math.max(...data.map((d) => d.minutes), 1);
   const barBase = TOP_PAD + CHART_H;
+
+  const currentTotal = period === '7일' ? WEEK_MINUTES : MONTH_MINUTES;
+  const prevTotal = period === '7일' ? PREV_WEEK_MINUTES : PREV_MONTH_MINUTES;
+  const growth = calcGrowth(currentTotal, prevTotal);
 
   const yLabels = [
     { value: maxMin, y: TOP_PAD + 4 },
@@ -193,6 +216,29 @@ const StudyBarChart: React.FC = () => {
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>{stat.label}</div>
           </div>
         ))}
+      </div>
+
+      {/* 성장률 */}
+      <div style={{
+        marginTop: 14,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: growth >= 0 ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)',
+        border: `1px solid ${growth >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)'}`,
+        borderRadius: 10,
+        padding: '10px 14px',
+      }}>
+        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+          {period === '7일' ? '지난 주 대비' : '지난 달 대비'} 성장률
+        </span>
+        <span style={{
+          color: growth >= 0 ? '#4ADE80' : '#EF4444',
+          fontSize: 15,
+          fontWeight: 700,
+        }}>
+          {growth >= 0 ? `+${growth}%` : `${growth}%`}
+        </span>
       </div>
     </div>
   );

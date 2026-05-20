@@ -4,6 +4,7 @@ export interface Stats {
   END: number;
   AGI: number;
   CHA: number;
+  COP: number;  // 협력 스탯 (파티 퀘스트 완수 보상)
 }
 
 export type QuizType = 'multiple' | 'short';

@@ -88,7 +88,7 @@ export const useUserStore = create<UserState>()(
     id: 'user-001',
     nickname: '탐험가',
     profileImage: null,
-    stats: { INT: 50, STR: 0, END: 10, AGI: 0, CHA: 0 },
+    stats: { INT: 50, STR: 0, END: 10, AGI: 0, CHA: 0, COP: 0 },
     gold: 1200,
     gems: 30,
     level: 7,
@@ -112,6 +112,7 @@ export const useUserStore = create<UserState>()(
             END: cur.END + (delta.END ?? 0),
             AGI: cur.AGI + (delta.AGI ?? 0),
             CHA: cur.CHA + (delta.CHA ?? 0),
+            COP: (cur.COP ?? 0) + (delta.COP ?? 0),
           },
         },
       };
@@ -204,6 +205,16 @@ export const useUserStore = create<UserState>()(
     return reward;
   },
     }),
-    { name: 'user-store' }
+    {
+      name: 'user-store',
+      version: 2,
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as UserState;
+        if (version < 2 && state?.user?.stats) {
+          if (state.user.stats.COP === undefined) state.user.stats.COP = 0;
+        }
+        return state;
+      },
+    }
   )
 );

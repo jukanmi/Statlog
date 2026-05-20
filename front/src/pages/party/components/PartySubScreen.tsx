@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
+import type { Stats } from '@/types';
 
 const PARTY_TAGS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'];
 const MAX_OPTIONS = [2, 3, 4, 5, 6, 8];
@@ -35,13 +36,28 @@ function Toast({ msg }: { msg: string }) {
 
 type View = 'list' | 'detail';
 
+// 파티 퀘스트 보상 정의 (협력 스탯 + 재화)
+interface QuestReward {
+  gold: number;
+  gems: number;
+  cop: number;  // 협력 스탯
+  label: string;
+}
+
+const QUEST_REWARDS: QuestReward[] = [
+  { gold: 200, gems: 0, cop: 3, label: '골드 200 + COP +3' },
+  { gold: 100, gems: 2, cop: 2, label: '골드 100 + 젬 2 + COP +2' },
+  { gold: 0,   gems: 5, cop: 2, label: '젬 5 + COP +2' },
+];
+
 const PartySubScreen: React.FC = () => {
-  const { parties, currentPartyId, user, joinParty, leaveParty, createParty } = useUserStore();
+  const { parties, currentPartyId, user, joinParty, leaveParty, createParty, updateCurrency, addStats } = useUserStore();
   const [view, setView] = useState<View>('list');
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [claimedQuests, setClaimedQuests] = useState<Set<number>>(new Set());
 
   // Create modal fields
   const [cName, setCName] = useState('');
@@ -180,30 +196,62 @@ const PartySubScreen: React.FC = () => {
           ].map((quest, qi) => {
             const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
             const done = pct >= 100;
+            const claimed = claimedQuests.has(qi);
+            const reward = QUEST_REWARDS[qi];
+
+            const handleClaimQuest = () => {
+              if (reward.gold > 0) updateCurrency(user.gold + reward.gold, undefined);
+              if (reward.gems > 0) updateCurrency(undefined, user.gems + reward.gems);
+              const statDelta: Partial<Stats> = { COP: reward.cop };
+              addStats(statDelta);
+              setClaimedQuests((prev) => new Set([...prev, qi]));
+              showToast(`보상 수령! ${reward.label} 획득`);
+            };
+
             return (
               <div
                 key={qi}
                 style={{
-                  background: done ? 'rgba(74,222,128,0.06)' : '#1A1A2E',
-                  border: `1px solid ${done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                  background: claimed ? 'rgba(201,168,76,0.04)' : done ? 'rgba(74,222,128,0.06)' : '#1A1A2E',
+                  border: `1px solid ${claimed ? 'rgba(201,168,76,0.2)' : done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
                   borderRadius: 14, padding: '14px 16px', marginBottom: 10,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ color: done ? '#4ADE80' : 'rgba(255,255,255,0.75)', fontSize: 13 }}>
-                    {done && '✓ '}{quest.label}
+                  <span style={{ color: claimed ? '#C9A84C' : done ? '#4ADE80' : 'rgba(255,255,255,0.75)', fontSize: 13 }}>
+                    {claimed ? '✅ ' : done ? '✓ ' : ''}{quest.label}
                   </span>
                   <span style={{ color: done ? '#4ADE80' : 'rgba(255,255,255,0.4)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
                     {quest.current}/{quest.target}{quest.unit}
                   </span>
                 </div>
-                <div style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', marginBottom: done ? 10 : 0 }}>
                   <div style={{
                     height: '100%', width: `${pct}%`,
-                    background: done ? '#4ADE80' : 'linear-gradient(90deg, #C9A84C, #E8CC7A)',
+                    background: claimed ? '#C9A84C' : done ? '#4ADE80' : 'linear-gradient(90deg, #C9A84C, #E8CC7A)',
                     borderRadius: 2,
                   }} />
                 </div>
+                {done && !claimed && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+                      {reward.label}
+                    </span>
+                    <button
+                      onClick={handleClaimQuest}
+                      style={{
+                        background: '#4ADE80', border: 'none', borderRadius: 8,
+                        padding: '6px 14px', color: '#000', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      보상 받기
+                    </button>
+                  </div>
+                )}
+                {claimed && (
+                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>수령 완료</div>
+                )}
               </div>
             );
           })}
