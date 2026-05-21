@@ -1,23 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats, StudyDepth } from '@/types';
-
-const DEPTH_MULTIPLIERS: Record<StudyDepth, number> = {
-  memorize: 1.0,
-  understand: 1.2,
-  apply: 1.5,
-};
-
-const DEPTH_LABELS: Record<StudyDepth, string> = {
-  memorize: '암기',
-  understand: '이해',
-  apply: '응용',
-};
+import type { Stats } from '@/types';
+import type { StatConversionResult } from '@/lib/api';
 
 interface StatUpdateScreenProps {
   subject: string;
   elapsedSeconds: number;
-  depth?: StudyDepth;
+  statGained: StatConversionResult | null; // AI가 반환한 stat_gained (성공 시)
+  loading: boolean;                        // AI 변환 요청 진행 중
+  error: string | null;                    // AI 변환 실패 메시지
   onDone: () => void;
 }
 
@@ -28,32 +19,24 @@ interface StatGain {
   delta: number;
 }
 
-const STAT_GAINS: Record<string, Partial<Stats>> = {
-  수학: { INT: 2, END: 1 },
-  과학: { INT: 2, END: 1 },
-  프로그래밍: { INT: 2, END: 1 },
-  영어: { INT: 1, CHA: 2, END: 1 },
-  국어: { INT: 1, CHA: 2, END: 1 },
-  사회: { CHA: 1, INT: 1, END: 1 },
-  기타: { INT: 1, END: 1 },
-};
+const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART'];
 
 const STAT_LABELS: Record<StatKey, string> = {
-  INT: '지식력',
-  STR: '근력',
-  END: '지구력',
-  AGI: '민첩성',
-  CHA: '매력',
-  COP: '협력력',
+  HUM: '인문학',
+  SOC: '사회과학',
+  NAT: '자연과학',
+  COL: '협동력',
+  PER: '끈기',
+  ART: '예체능',
 };
 
 const STAT_ICONS: Record<StatKey, string> = {
-  INT: '🧠',
-  STR: '⚡',
-  END: '🛡️',
-  AGI: '💨',
-  CHA: '✨',
-  COP: '🤝',
+  HUM: '📖',
+  SOC: '🏛️',
+  NAT: '🔬',
+  COL: '🤝',
+  PER: '🔥',
+  ART: '🎨',
 };
 
 function formatDuration(seconds: number): string {
@@ -64,119 +47,176 @@ function formatDuration(seconds: number): string {
   return `${m}분 ${s}초`;
 }
 
-const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({ subject, elapsedSeconds, depth, onDone }) => {
+const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
+  subject,
+  elapsedSeconds,
+  statGained,
+  loading,
+  error,
+  onDone,
+}) => {
   const userStats = useUserStore((s) => s.user.stats);
   const addStats = useUserStore((s) => s.addStats);
+  const addExp = useUserStore((s) => s.addExp);
   const [animated, setAnimated] = useState(false);
   const [applied, setApplied] = useState(false);
 
-  const baseGains = STAT_GAINS[subject] ?? STAT_GAINS['기타'];
-  const multiplier = depth ? DEPTH_MULTIPLIERS[depth] : 1;
+  // AI가 반환한 능력치 중 0보다 큰 항목만 추출
+  const statGains: StatGain[] = statGained
+    ? STAT_KEYS.map((key) => ({ key, delta: statGained[key] ?? 0 })).filter(
+        (g) => g.delta > 0
+      )
+    : [];
+  const expGained = statGained?.EXP ?? 0;
 
-  const statGains: StatGain[] = (Object.entries(baseGains) as [StatKey, number][]).map(
-    ([key, delta]) => ({ key, delta: Math.round(delta * multiplier) })
-  );
-
-  const actualGains: Partial<Stats> = Object.fromEntries(
-    statGains.map(({ key, delta }) => [key, delta])
-  ) as Partial<Stats>;
-
-  const totalPoints = statGains.reduce((sum, g) => sum + g.delta, 0);
-
+  // statGained가 도착하면 단 한 번만 스토어에 반영
   useEffect(() => {
-    if (!applied) {
-      addStats(actualGains);
+    if (statGained && !applied) {
+      addStats(
+        STAT_KEYS.reduce<Partial<Stats>>((acc, key) => {
+          acc[key] = statGained[key] ?? 0;
+          return acc;
+        }, {})
+      );
+      addExp(statGained.EXP ?? 0);
       setApplied(true);
     }
+  }, [statGained, applied, addStats, addExp]);
+
+  useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 150);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div
+  const containerStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 100,
+    backgroundColor: '#0F0F1A',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '0 24px',
+    paddingTop: 'calc(64px + env(safe-area-inset-top))',
+    paddingBottom: 'calc(48px + env(safe-area-inset-bottom))',
+    maxWidth: 430,
+    margin: '0 auto',
+  };
+
+  const doneButton = (
+    <button
+      onClick={onDone}
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        backgroundColor: '#0F0F1A',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '0 24px',
-        paddingTop: 'calc(64px + env(safe-area-inset-top))',
-        paddingBottom: 'calc(48px + env(safe-area-inset-bottom))',
-        maxWidth: 430,
-        margin: '0 auto',
+        width: '100%',
+        height: 52,
+        backgroundColor: '#C9A84C',
+        border: 'none',
+        borderRadius: 14,
+        color: '#0F0F1A',
+        fontSize: 16,
+        fontWeight: 700,
+        cursor: 'pointer',
+        marginTop: 28,
+        boxShadow: '0 0 24px rgba(201,168,76,0.35)',
+        transition: 'transform 150ms ease',
+      }}
+      onMouseDown={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)';
+      }}
+      onMouseUp={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
       }}
     >
+      홈으로 돌아가기
+    </button>
+  );
+
+  // --- 로딩: AI 변환 요청 중 ---
+  if (loading) {
+    return (
+      <div style={{ ...containerStyle, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 44, marginBottom: 16 }}>🤖</div>
+        <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0 }}>
+          AI가 학습 내용을 분석하고 있어요...
+        </p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+          잠시만 기다려 주세요
+        </p>
+      </div>
+    );
+  }
+
+  // --- 에러: AI 변환 실패 ---
+  if (error) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ fontSize: 44, marginBottom: 16 }}>⚠️</div>
+          <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0, textAlign: 'center' }}>
+            스탯 분석에 실패했어요
+          </p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8, textAlign: 'center' }}>
+            {error}
+          </p>
+        </div>
+        {doneButton}
+      </div>
+    );
+  }
+
+  // --- 정답 0개 등으로 stat_gained가 없는 경우 ---
+  if (!statGained || statGains.length === 0) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ fontSize: 44, marginBottom: 16 }}>📚</div>
+          <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0, textAlign: 'center' }}>
+            이번엔 스탯을 획득하지 못했어요
+          </p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8, textAlign: 'center' }}>
+            퀴즈를 맞히면 AI가 스탯을 분석해 줘요
+          </p>
+        </div>
+        {doneButton}
+      </div>
+    );
+  }
+
+  // --- 정상: AI가 반환한 스탯 표시 ---
+  return (
+    <div style={containerStyle}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', margin: 0, marginBottom: 8 }}>
-          스탯이 올랐어요!
+          스탯이 올랐어요! ✨
         </h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
           {subject} · {formatDuration(elapsedSeconds)} 학습
-          {depth && (
-            <span style={{ marginLeft: 8, color: '#C9A84C', fontWeight: 600 }}>
-              [{DEPTH_LABELS[depth]} {DEPTH_MULTIPLIERS[depth] > 1 ? `x${DEPTH_MULTIPLIERS[depth]}` : ''}]
-            </span>
-          )}
         </p>
       </div>
 
-      {/* Total EXP summary */}
-      <div style={{
-        backgroundColor: 'rgba(201,168,76,0.08)',
-        border: '1px solid rgba(201,168,76,0.2)',
-        borderRadius: 14,
-        padding: '14px 18px',
-        marginBottom: 20,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>총 스탯 포인트 획득</span>
-        <span style={{ fontSize: 22, fontWeight: 700, color: '#C9A84C' }}>+{totalPoints}</span>
-      </div>
-
-      {/* Distribution bar */}
-      {statGains.length > 1 && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
-            {statGains.map(({ key, delta }, i) => {
-              const pct = Math.round((delta / totalPoints) * 100);
-              const colors = ['#C9A84C', '#A78BFA', '#4ADE80', '#60A5FA', '#F97316'];
-              return (
-                <div
-                  key={key}
-                  style={{
-                    width: animated ? `${pct}%` : '0%',
-                    backgroundColor: colors[i % colors.length],
-                    transition: `width 600ms ease-out ${i * 100}ms`,
-                  }}
-                />
-              );
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-            {statGains.map(({ key, delta }, i) => {
-              const pct = Math.round((delta / totalPoints) * 100);
-              const colors = ['#C9A84C', '#A78BFA', '#4ADE80', '#60A5FA', '#F97316'];
-              return (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: colors[i % colors.length] }} />
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{key} {pct}%</span>
-                </div>
-              );
-            })}
-          </div>
+      {/* EXP 획득 배너 */}
+      {expGained > 0 && (
+        <div
+          style={{
+            backgroundColor: 'rgba(167,139,250,0.12)',
+            border: '1px solid rgba(167,139,250,0.4)',
+            borderRadius: 14,
+            padding: '14px 18px',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span style={{ fontSize: 14, color: '#FFFFFF', fontWeight: 600 }}>경험치 획득</span>
+          <span style={{ fontSize: 18, color: '#A78BFA', fontWeight: 700 }}>+{expGained} EXP</span>
         </div>
       )}
 
       {/* Stat cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
-        {statGains.map(({ key, delta }, _i) => {
-          const currentValue = userStats[key];
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, overflowY: 'auto' }}>
+        {statGains.map(({ key, delta }) => {
+          const currentValue = userStats[key] ?? 0;
           const targetValue = Math.min(currentValue, 100);
           const barWidth = animated ? `${targetValue}%` : '0%';
 
@@ -261,31 +301,7 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({ subject, elapsedSec
       </div>
 
       {/* Done button */}
-      <button
-        onClick={onDone}
-        style={{
-          width: '100%',
-          height: 52,
-          backgroundColor: '#C9A84C',
-          border: 'none',
-          borderRadius: 14,
-          color: '#0F0F1A',
-          fontSize: 16,
-          fontWeight: 700,
-          cursor: 'pointer',
-          marginTop: 28,
-          boxShadow: '0 0 24px rgba(201,168,76,0.35)',
-          transition: 'transform 150ms ease',
-        }}
-        onMouseDown={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)';
-        }}
-        onMouseUp={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-        }}
-      >
-        홈으로 돌아가기
-      </button>
+      {doneButton}
     </div>
   );
 };

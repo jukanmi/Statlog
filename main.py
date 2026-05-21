@@ -1,23 +1,56 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
+from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
+from fastapi.middleware.cors import CORSMiddleware
+from api import auth, users, analytics
+from services.oauth import close_http_client
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    yield
+    # shutdown
+    await close_http_client()
+
+
+app = FastAPI(title="Statlog API", lifespan=lifespan)
+
+# 프론트엔드 로컬 개발 주소 허용
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",  # Vite 개발 서버 (vite.config.ts의 server.port)
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 # --- 데이터 모델 (프론트 명세서 기반) ---
 
-class Stats(BaseModel):
-    INT: int = 0
-    STR: int = 0
-    END: int = 0
-    AGI: int = 0
-    CHA: int = 0
+# 스탯클래스 /AI_routers/ai_log.py로 이동
 
 class User(BaseModel):
     id: str
     nickname: str
     profile_image: Optional[str] = None
-    stats: Stats
+    stats: StatResponse
     gold: int
     gems: int
     level: int
@@ -32,7 +65,7 @@ async def get_my_profile():
     return {
         "id": "user-001",
         "nickname": "학습왕",
-        "stats": {"INT": 50, "STR": 10, "END": 20, "AGI": 5, "CHA": 10},
+        "stats": {"HUM": 50, "SOC": 0, "NAT": 10, "COL": 0, "PER": 0, "ART": 0},
         "gold": 1000,
         "gems": 50,
         "level": 1,
@@ -48,12 +81,9 @@ class StudySessionRequest(BaseModel):
 
 @app.post("/api/v1/study/sessions", status_code=201)
 async def save_study_session(session: StudySessionRequest):
-    # 여기서 나중에 GCP AI 서버로 content를 보내서 스탯을 계산할 거예요!
-    # 지금은 성공했다는 메시지만 보냅니다.
-    print(f"받은 공부 내용: {session.content}")
-    
+    stat_gained = await analyze_log_to_stats(session.content, session.duration_minutes)
     return {
         "id": "session-123",
         "subject": session.subject,
-        "stat_gained": {"INT": 5, "END": 2} # 가짜 보상 데이터
+        "stat_gained": stat_gained
     }

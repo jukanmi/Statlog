@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
-import BottomTabBar from './components/BottomTabBar';
+import AuthCallback from './pages/auth/AuthCallback';
+import BottomTabBar, { type Tab } from './components/BottomTabBar';
 import PlaceholderPage from './components/PlaceholderPage';
 import HomePage from './pages/home/HomePage';
 import PokedexPage from './pages/pokedex/PokedexPage';
 import PartyPage from './pages/party/PartyPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import AttendanceModal from './components/AttendanceModal';
+import ConsentModal from './components/ConsentModal';
 import { useUserStore } from './store/useUserStore';
 import { useStudyStore } from './store/useStudyStore';
 
@@ -30,14 +32,29 @@ const App: React.FC = () => {
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA');
     if (lastAttendanceDate !== today) {
       setShowAttendance(true);
     }
   };
 
+  useEffect(() => {
+    const handleAuthSuccess = () => handleLogin();
+    window.addEventListener('auth_success', handleAuthSuccess);
+    return () => window.removeEventListener('auth_success', handleAuthSuccess);
+  }, []);
+
   if (!isAuthenticated) {
-    return <AuthScreen onLogin={handleLogin} />;
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-[430px] mx-auto">
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<AuthScreen onLogin={handleLogin} />} />
+          </Routes>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -58,6 +75,7 @@ const App: React.FC = () => {
       </div>
       <BottomTabBar />
       {showAttendance && <AttendanceModal onClose={() => setShowAttendance(false)} />}
+      <ConsentModal />
     </div>
   );
 };

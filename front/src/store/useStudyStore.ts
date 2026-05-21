@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { StudySession } from '@/types';
 
+
 type TimerState = 'idle' | 'studying' | 'paused';
 
 function getMondayStr(dateStr: string): string {
@@ -15,17 +16,16 @@ function getMondayStr(dateStr: string): string {
 interface StudyState {
   sessions: StudySession[];
   todayMinutes: number;
-  todayDate: string | null;      // 'YYYY-MM-DD' — 마지막으로 todayMinutes를 집계한 날짜
+  todayDate: string | null;      // 'YYYY-MM-DD'
   weeklyMinutes: number;         // 이번 주(월요일 기준) 누적 학습 분수
-  weeklyDate: string | null;     // 현재 주의 월요일 날짜 'YYYY-MM-DD'
+  weeklyDate: string | null;     // 마지막 세션 날짜 (주 초기화 기준)
   currentSubject: string;
   currentContent: string;
-  studyStreak: number;           // consecutive study days
-  streakBonusPending: boolean;   // true when a 7-day milestone is reached
-  // Timer state (persists across tab switches)
+  studyStreak: number;
+  streakBonusPending: boolean;
   timerState: TimerState;
-  startedAt: number | null;      // Date.now() when current segment started
-  accumulatedSeconds: number;    // seconds banked before current segment
+  startedAt: number | null;
+  accumulatedSeconds: number;
   addSession: (session: StudySession) => void;
   clearSessions: () => void;
   startTimer: () => void;
@@ -114,7 +114,7 @@ export const useStudyStore = create<StudyState>()(
         set({ timerState: 'idle', startedAt: null, accumulatedSeconds: 0 }),
       checkDayReset: () =>
         set((state) => {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = new Date().toLocaleDateString('sv-SE');
           if (state.todayDate !== null && state.todayDate !== today) {
             return { todayMinutes: 0, todayDate: today, timerState: 'idle', startedAt: null, accumulatedSeconds: 0 };
           }
@@ -130,10 +130,11 @@ export const useStudyStore = create<StudyState>()(
         if (version < 2) {
           state.weeklyMinutes = state.weeklyMinutes ?? 0;
           state.weeklyDate = state.weeklyDate ?? null;
+          state.studyStreak = state.studyStreak ?? 0;
+          state.streakBonusPending = state.streakBonusPending ?? false;
         }
         return state;
       },
-      // 타이머 진행 상태(startedAt)는 복원 시 리셋 — 앱 재시작 후 타이머가 이상하게 돌아가는 것 방지
       partialize: (state) => ({
         sessions: state.sessions,
         todayMinutes: state.todayMinutes,
@@ -143,7 +144,9 @@ export const useStudyStore = create<StudyState>()(
         currentSubject: state.currentSubject,
         currentContent: state.currentContent,
         studyStreak: state.studyStreak,
-        accumulatedSeconds: state.accumulatedSeconds,
+        accumulatedSeconds: state.timerState === 'studying' && state.startedAt
+          ? Math.floor((Date.now() - state.startedAt) / 1000)
+          : state.accumulatedSeconds,
         timerState: state.timerState === 'studying' ? 'paused' : state.timerState,
         startedAt: null,
       }),
