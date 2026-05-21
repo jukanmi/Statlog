@@ -1,18 +1,19 @@
 import { useUserStore } from '@/store/useUserStore';
+import type { Stats } from '@/types';
 
 interface CategoryRank {
   category: string;
   icon: string;
-  statKey: 'INT' | 'CHA' | 'STR' | 'END' | 'AGI';
+  statKey: keyof Stats;
   totalUsers: number;
 }
 
 const CATEGORIES: CategoryRank[] = [
-  { category: '개발자', icon: '💻', statKey: 'INT', totalUsers: 12400 },
-  { category: '마케터', icon: '📢', statKey: 'CHA', totalUsers: 5800 },
-  { category: '디자이너', icon: '🎨', statKey: 'AGI', totalUsers: 3200 },
-  { category: '체력관리', icon: '🏋️', statKey: 'STR', totalUsers: 8900 },
-  { category: '자격증', icon: '📜', statKey: 'END', totalUsers: 21000 },
+  { category: '개발자', icon: '💻', statKey: 'NAT', totalUsers: 12400 },
+  { category: '마케터', icon: '📢', statKey: 'SOC', totalUsers: 5800 },
+  { category: '디자이너', icon: '🎨', statKey: 'ART', totalUsers: 3200 },
+  { category: '체력관리', icon: '🏋️', statKey: 'ART', totalUsers: 8900 },
+  { category: '자격증', icon: '📜', statKey: 'PER', totalUsers: 21000 },
 ];
 
 function calcTopPercent(stat: number, totalUsers: number): number {
