@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useQuestStore } from '@/store/useQuestStore';
 import { usePomodoroTimer } from '@/hooks/usePomodoroTimer';
@@ -16,6 +16,12 @@ import TimerActionButtons from './components/TimerActionButtons';
 import QuestGoalModal from './components/QuestGoalModal';
 import { VerificationPopup } from './components/VerificationPopup';
 import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
+import QuizCreateModal from './components/QuizCreateModal';
+import QuizListModal from './components/QuizListModal';
+import StreakBonusModal from './components/StreakBonusModal';
+import BurnoutWarningModal from './components/BurnoutWarningModal';
+
+const BURNOUT_THRESHOLD_MINUTES = 180; // 3시간
 
 type HomeScreen = 'timer' | 'quiz' | 'result' | 'stat';
 
@@ -23,6 +29,8 @@ const HomePage: React.FC = () => {
   const todayMinutes = useStudyStore((s) => s.todayMinutes);
   const currentSubject = useStudyStore((s) => s.currentSubject);
   const currentContent = useStudyStore((s) => s.currentContent);
+  const studyStreak = useStudyStore((s) => s.studyStreak);
+  const streakBonusPending = useStudyStore((s) => s.streakBonusPending);
 
   // TAGS: Hook, Quest, State, Sync
   const {
@@ -66,14 +74,33 @@ const HomePage: React.FC = () => {
   const [showVerification, setShowVerification] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+  const [showQuizCreate, setShowQuizCreate] = useState(false);
+  const [showQuizList, setShowQuizList] = useState(false);
+  const [showStreakBonus, setShowStreakBonus] = useState(false);
+  const [showBurnout, setShowBurnout] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const burnoutShownRef = useRef(false);
 
   // --- AI 스탯 변환 상태 ---
   const [statGained, setStatGained] = useState<StatConversionResult | null>(null);
   const [statLoading, setStatLoading] = useState(false);
   const [statError, setStatError] = useState<string | null>(null);
 
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
+
+  // 번아웃 위험 감지
+  useEffect(() => {
+    if (!burnoutShownRef.current && todayMinutes >= BURNOUT_THRESHOLD_MINUTES) {
+      burnoutShownRef.current = true;
+      setShowBurnout(true);
+    }
+  }, [todayMinutes]);
+
   // 퀴즈를 맞췄을 때 백엔드 AI에 학습 내용을 보내 stat_gained를 받아온다
-  const fetchStatGained = async (elapsedSeconds: number) => {
+  const fetchStatGained = async (elapsed: number) => {
     setStatLoading(true);
     setStatError(null);
     setStatGained(null);
@@ -81,7 +108,7 @@ const HomePage: React.FC = () => {
       const result = await convertStudyToStats({
         subject: currentSubject || '기타',
         content: currentContent,
-        durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+        durationMinutes: Math.max(1, Math.round(elapsed / 60)),
         date: new Date().toLocaleDateString('en-CA'),
       });
       setStatGained(result);
@@ -126,17 +153,17 @@ const HomePage: React.FC = () => {
   const handleModalSave = () => {
     setSavedElapsedSeconds(timerMode === 'pomodoro' ? totalStudiedSeconds : elapsedSeconds);
     setIsModalOpen(false);
-    
+
     if (timerMode === 'pomodoro') {
       completePomodoroSession();
     } else {
       resetTimer();
     }
-    
-    if (Math.random() < 0.5) { // 50% 확률로 AI 검증 팝업 띄우기
+
+    if (Math.random() < 0.5) {
       setShowVerification(true);
     } else {
-    setScreen('quiz');
+      setScreen('quiz');
     }
   };
 
@@ -148,7 +175,6 @@ const HomePage: React.FC = () => {
   const handleQuizComplete = (correctCount: number) => {
     setQuizCorrectCount(correctCount);
     setScreen('result');
-    // 퀴즈를 하나라도 맞췄을 때만 AI 스탯 변환을 요청한다
     if (correctCount > 0) {
       void fetchStatGained(savedElapsedSeconds);
     }
@@ -160,20 +186,7 @@ const HomePage: React.FC = () => {
     setScreen('timer');
     setStatGained(null);
     setStatError(null);
-  };
-
-  // Pomodoro notice actions
-  const handlePomodoroBreakStart = () => {
-    setPomNotice(null);
-    setPomPhase('break');
-    resetTimer();
-  };
-
-  const handlePomodoroNextRound = () => {
-    setPomNotice(null);
-    setPomPhase('study');
-    setPomRound((r) => Math.min(r + 1, 4));
-    resetTimer();
+    if (streakBonusPending) setShowStreakBonus(true);
   };
 
   const handlePomodoroComplete = () => {
@@ -181,8 +194,6 @@ const HomePage: React.FC = () => {
     setSavedElapsedSeconds(saved);
     setScreen('quiz');
   };
-
-
 
   // --- Non-timer screens ---
   if (screen === 'quiz') {
@@ -272,8 +283,7 @@ const HomePage: React.FC = () => {
       {/* Top: today's study time */}
       <TodayStudyProgress formattedTime={todayFormatted} />
 
-      {/* TAGS: View, Render, Quest, Condition, Integration */}
-      {/* Daily Quest (visible during active and idle state) */}
+      {/* Daily Quest */}
       {!pomNotice && (
         <div style={{ width: '100%', maxWidth: 400, marginTop: 16, zIndex: 10 }}>
           <DailyQuestCard
@@ -290,17 +300,17 @@ const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* Mode toggle (only when idle and not in active session) */}
+      {/* Mode toggle */}
       {!isActive && !pomNotice && (
         <TimerModeToggle timerMode={timerMode} onSwitchMode={switchMode} />
       )}
 
-      {/* Pomodoro round indicator (when active) */}
+      {/* Pomodoro round indicator */}
       {isPomodoro && isActive && !pomNotice && (
         <PomodoroIndicator pomRound={pomRound} isBreak={isBreak} />
       )}
 
-      {/* No-round-indicator spacer for normal mode */}
+      {/* Spacer */}
       {(!isPomodoro || !isActive || pomNotice) && isActive && (
         <div style={{ marginBottom: 24 }} />
       )}
@@ -315,7 +325,6 @@ const HomePage: React.FC = () => {
           centerLabel={centerLabel}
         />
 
-        {/* Pomodoro phase notice overlay */}
         <PomodoroNoticeOverlay
           pomNotice={pomNotice}
           pomRound={pomRound}
@@ -337,6 +346,44 @@ const HomePage: React.FC = () => {
         />
       )}
 
+      {/* Quiz entry buttons */}
+      {!isActive && !pomNotice && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+          <button
+            onClick={() => setShowQuizCreate(true)}
+            style={{
+              background: 'none', border: '1px solid rgba(201,168,76,0.35)',
+              borderRadius: 20, padding: '7px 16px', color: '#C9A84C',
+              fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            + 퀴즈 만들기
+          </button>
+          <button
+            onClick={() => setShowQuizList(true)}
+            style={{
+              background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '7px 16px', color: 'rgba(255,255,255,0.4)',
+              fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            내 퀴즈
+          </button>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toastMsg && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,15,26,0.96)', border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 14, padding: '11px 22px', color: '#fff', fontSize: 14,
+          zIndex: 300, whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          {toastMsg}
+        </div>
+      )}
+
       {/* Study modal */}
       <StudyModal
         isOpen={isModalOpen}
@@ -346,7 +393,7 @@ const HomePage: React.FC = () => {
         onClose={handleModalClose}
       />
 
-      {/* Quest Goal Setup modal */}
+      {/* Quest Goal modal */}
       <QuestGoalModal
         isOpen={isQuestModalOpen}
         initialMinutes={dailyStudyGoalMinutes}
@@ -355,6 +402,7 @@ const HomePage: React.FC = () => {
         onClose={() => setIsQuestModalOpen(false)}
       />
 
+      {/* AI 검증 팝업 */}
       {showVerification && (
         <VerificationPopup
           onSuccess={() => {
@@ -367,6 +415,37 @@ const HomePage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Streak bonus modal */}
+      {showStreakBonus && (
+        <StreakBonusModal
+          streak={studyStreak}
+          onClose={() => setShowStreakBonus(false)}
+        />
+      )}
+
+      {/* 번아웃 경고 모달 */}
+      {showBurnout && (
+        <BurnoutWarningModal
+          todayMinutes={todayMinutes}
+          onClose={() => setShowBurnout(false)}
+          onAcceptRest={() => {
+            setShowBurnout(false);
+            showToast('잘 쉬세요! 보상이 지급됐어요');
+          }}
+        />
+      )}
+
+      <QuizCreateModal
+        isOpen={showQuizCreate}
+        onClose={() => setShowQuizCreate(false)}
+        onCreated={() => showToast('퀴즈가 추가됐어요! 다음 학습에 출제돼요')}
+      />
+
+      <QuizListModal
+        isOpen={showQuizList}
+        onClose={() => setShowQuizList(false)}
+      />
     </div>
   );
 };

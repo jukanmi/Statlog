@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { useSocialStore } from '@/store/useSocialStore';
+import type { Stats } from '@/types';
 
 const PARTY_TAGS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'];
 const MAX_OPTIONS = [2, 3, 4, 5, 6, 8];
@@ -36,14 +37,29 @@ function Toast({ msg }: { msg: string }) {
 
 type View = 'list' | 'detail';
 
+// 파티 퀘스트 보상 (협동력 COL 스탯 + 재화)
+interface QuestReward {
+  gold: number;
+  gems: number;
+  col: number;  // 협동력 스탯
+  label: string;
+}
+
+const QUEST_REWARDS: QuestReward[] = [
+  { gold: 200, gems: 0, col: 3, label: '골드 200 + COL +3' },
+  { gold: 100, gems: 2, col: 2, label: '골드 100 + 젬 2 + COL +2' },
+  { gold: 0,   gems: 5, col: 2, label: '젬 5 + COL +2' },
+];
+
 const PartySubScreen: React.FC = () => {
-  const { user } = useUserStore();
+  const { user, updateCurrency, addStats } = useUserStore();
   const { parties, currentPartyId, joinParty, leaveParty, createParty } = useSocialStore();
   const [view, setView] = useState<View>('list');
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [claimedQuests, setClaimedQuests] = useState<Set<number>>(new Set());
 
   // Create modal fields
   const [cName, setCName] = useState('');
@@ -80,7 +96,7 @@ const PartySubScreen: React.FC = () => {
     setShowModal(false);
     setCName(''); setCDesc(''); setCMax(4); setCTags([]);
     setView('detail');
-    showToast('파티가 생성되었어요! ⚔️');
+    showToast('파티가 생성됐어요! ⚔️');
   };
 
   const toggleTag = (tag: string) => {
@@ -141,6 +157,102 @@ const PartySubScreen: React.FC = () => {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Invite link */}
+        <div style={{ padding: '16px 20px 0' }}>
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}?join=${currentParty.id}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                showToast('초대 링크가 복사됐어요!');
+              } catch {
+                showToast('링크 복사에 실패했어요');
+              }
+            }}
+            style={{
+              width: '100%', height: 44, borderRadius: 12, cursor: 'pointer',
+              border: '1px solid rgba(167,139,250,0.3)',
+              background: 'rgba(167,139,250,0.08)', color: '#A78BFA',
+              fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <span>🔗</span>
+            <span>초대 링크 복사</span>
+          </button>
+        </div>
+
+        {/* Party quests */}
+        <div style={{ padding: '20px 20px 0' }}>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>파티 퀘스트</div>
+          {[
+            { label: '이번 주 합산 학습 1,000분', current: currentParty.weeklyMinutes, target: 1000, unit: '분' },
+            {
+              label: '파티원 각자 1시간 이상 학습',
+              current: MOCK_MEMBERS.filter((m) => m.weeklyMinutes >= 60).length,
+              target: MOCK_MEMBERS.length,
+              unit: '명',
+            },
+            { label: '5일 연속 학습 유지', current: 3, target: 5, unit: '일' },
+          ].map((quest, qi) => {
+            const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
+            const done = pct >= 100;
+            const claimed = claimedQuests.has(qi);
+            const reward = QUEST_REWARDS[qi];
+
+            const handleClaimQuest = () => {
+              if (reward.gold > 0) updateCurrency(user.gold + reward.gold, undefined);
+              if (reward.gems > 0) updateCurrency(undefined, user.gems + reward.gems);
+              const statDelta: Partial<Stats> = { COL: reward.col };
+              addStats(statDelta);
+              setClaimedQuests((prev) => new Set([...prev, qi]));
+              showToast(`보상 수령! ${reward.label} 획득`);
+            };
+
+            return (
+              <div
+                key={qi}
+                style={{
+                  background: claimed ? 'rgba(201,168,76,0.04)' : done ? 'rgba(74,222,128,0.06)' : '#1A1A2E',
+                  border: `1px solid ${claimed ? 'rgba(201,168,76,0.2)' : done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                  borderRadius: 14, padding: '14px 16px', marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ color: claimed ? '#C9A84C' : done ? '#4ADE80' : 'rgba(255,255,255,0.75)', fontSize: 13 }}>
+                    {claimed ? '✅ ' : done ? '✓ ' : ''}{quest.label}
+                  </span>
+                  <span style={{ color: done ? '#4ADE80' : 'rgba(255,255,255,0.4)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                    {quest.current}/{quest.target}{quest.unit}
+                  </span>
+                </div>
+                <div style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', marginBottom: done && !claimed ? 10 : 0 }}>
+                  <div style={{
+                    height: '100%', width: `${pct}%`,
+                    background: claimed ? '#C9A84C' : done ? '#4ADE80' : 'linear-gradient(90deg, #C9A84C, #E8CC7A)',
+                    borderRadius: 2,
+                  }} />
+                </div>
+                {done && !claimed && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{reward.label}</span>
+                    <button
+                      onClick={handleClaimQuest}
+                      style={{
+                        background: '#4ADE80', border: 'none', borderRadius: 8,
+                        padding: '6px 14px', color: '#000', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      보상 받기
+                    </button>
+                  </div>
+                )}
+                {claimed && <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>수령 완료</div>}
+              </div>
+            );
+          })}
         </div>
 
         {/* Member list */}
@@ -205,7 +317,6 @@ const PartySubScreen: React.FC = () => {
           </button>
         </div>
 
-        {/* Confirm leave modal */}
         {confirmLeave && <ConfirmModal
           text="정말 탈퇴하시겠어요?"
           sub="파티를 나가면 다시 가입해야 해요"
@@ -303,14 +414,12 @@ const PartySubScreen: React.FC = () => {
                 {party.memberCount}/{party.maxMembers}
               </span>
             </div>
-
             <div style={{
               color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {party.description}
             </div>
-
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               {party.tags.map((tag) => (
                 <span key={tag} style={{
@@ -321,7 +430,6 @@ const PartySubScreen: React.FC = () => {
                 </span>
               ))}
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
                 📚 이번주 {party.weeklyMinutes}분 학습
@@ -370,16 +478,13 @@ const PartySubScreen: React.FC = () => {
             background: '#1A1A2E', borderRadius: '24px 24px 0 0',
             border: '1px solid rgba(255,255,255,0.08)',
             padding: '20px 20px calc(env(safe-area-inset-bottom) + 24px)',
-            width: '100%', maxHeight: '88dvh', overflowY: 'auto',
-            boxSizing: 'border-box',
+            width: '100%', maxHeight: '88dvh', overflowY: 'auto', boxSizing: 'border-box',
           }}>
             <div style={{
               width: 40, height: 4, background: 'rgba(255,255,255,0.15)',
               borderRadius: 2, margin: '0 auto 20px',
             }} />
-            <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginBottom: 24 }}>
-              새 파티 만들기
-            </div>
+            <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginBottom: 24 }}>새 파티 만들기</div>
 
             <ModalLabel text="파티 이름" required />
             <input
@@ -499,22 +604,16 @@ function ConfirmModal({ text, sub, onCancel, onConfirm }: {
         <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 8 }}>{text}</div>
         <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', marginBottom: 24 }}>{sub}</div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1, height: 48, borderRadius: 12, cursor: 'pointer',
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 14,
-            }}
-          >취소</button>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 1, height: 48, borderRadius: 12, cursor: 'pointer',
-              border: 'none',
-              background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontSize: 14, fontWeight: 700,
-            }}
-          >탈퇴하기</button>
+          <button onClick={onCancel} style={{
+            flex: 1, height: 48, borderRadius: 12, cursor: 'pointer',
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 14,
+          }}>취소</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, height: 48, borderRadius: 12, cursor: 'pointer',
+            border: 'none',
+            background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontSize: 14, fontWeight: 700,
+          }}>탈퇴하기</button>
         </div>
       </div>
     </div>

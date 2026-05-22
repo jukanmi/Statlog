@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
+import { useStudyStore } from '@/store/useStudyStore';
 import { useSocialStore } from '@/store/useSocialStore';
 import type { GuildMember } from '@/store/useSocialStore';
 
@@ -55,6 +56,7 @@ function Toast({ msg }: { msg: string }) {
 const GuildSubScreen: React.FC = () => {
   const { user, updateCurrency } = useUserStore();
   const { guilds, currentGuildId, joinGuild, leaveGuild, createGuild } = useSocialStore();
+  const actualWeeklyMinutes = useStudyStore((s) => s.weeklyMinutes);
   const [view, setView] = useState<View>('list');
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -110,7 +112,7 @@ const GuildSubScreen: React.FC = () => {
 
   // ─── My Guild Detail Screen ────────────────────────────────────────────────
   if (view === 'detail' && currentGuild) {
-    const userWeeklyMinutes = MOCK_GUILD_MEMBERS.find((m) => m.id === user.id)?.weeklyMinutes ?? 0;
+    const userWeeklyMinutes = actualWeeklyMinutes;
     const sortedMembers = [...MOCK_GUILD_MEMBERS].sort((a, b) => b.weeklyMinutes - a.weeklyMinutes);
     const guildTotalMinutes = currentGuild.weeklyMinutes * 6;
 
