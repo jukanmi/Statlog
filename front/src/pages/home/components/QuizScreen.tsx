@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Clock } from 'lucide-react';
 import { generateQuiz, type Quiz } from '@/lib/api';
 
 interface QuizScreenProps {
@@ -34,6 +34,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [advancing, setAdvancing] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
   const correctAtSelect = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -68,6 +69,34 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    setTimeLeft(30);
+  }, [currentIndex]);
+
+  useEffect(() => {
+    if (!quizzes || selectedIndex !== null || advancing) return;
+    if (timeLeft <= 0) {
+      handleTimeout();
+      return;
+    }
+    const timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+    return () => clearInterval(timerId);
+  }, [timeLeft, quizzes, selectedIndex, advancing]);
+
+  const handleTimeout = () => {
+    setSelectedIndex(-1);
+    setAdvancing(true);
+    timeoutRef.current = setTimeout(() => {
+      if (currentIndex < quizzes!.length - 1) {
+        setCurrentIndex((p) => p + 1);
+        setSelectedIndex(null);
+        setAdvancing(false);
+      } else {
+        onComplete(correctCount);
+      }
+    }, 1500);
+  };
 
   // --- 에러: 잠시 표시 후 자동 스킵 ---
   if (loadError) {
@@ -197,58 +226,64 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
         overflow: 'hidden',
       }}
     >
-      {/* Top bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 32,
-        }}
-      >
-        {/* Close */}
+
+        {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+        
+        {/* 닫기 버튼 (기존 유지) */}
         <button
           onClick={onSkip}
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            border: 'none',
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            color: 'rgba(255,255,255,0.4)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            width: 36, height: 36, borderRadius: '50%', border: 'none',
+            backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <X size={16} />
         </button>
 
-        {/* Progress dots */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {Array.from({ length: TOTAL }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === currentIndex ? 20 : 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: i === currentIndex
-                  ? '#C9A84C'
-                  : i < currentIndex
-                    ? 'rgba(201,168,76,0.4)'
-                    : 'rgba(255,255,255,0.12)',
-                transition: 'all 300ms ease',
-              }}
-            />
-          ))}
-        </div>
+        {/* ▼ 새롭게 묶인 오른쪽 UI 영역 (시계 + 막대기 + 문제번호) ▼ */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          
+          {/* 1. 새로 추가된 시계 UI */}
+          <div style={{ 
+            display: 'flex', alignItems: 'center', gap: 6, 
+            color: timeLeft <= 10 ? '#EF4444' : '#FBBF24',
+            fontWeight: 700, fontSize: 15,
+            animation: timeLeft <= 10 ? 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
+          }}>
+            <Clock size={16} />
+            {timeLeft}초
+          </div>
 
-        {/* Counter */}
-        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
-          {currentIndex + 1} / {TOTAL}
-        </span>
+          {/* Progress dots */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {Array.from({ length: TOTAL }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: i === currentIndex ? 20 : 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: i === currentIndex
+                    ? '#C9A84C'
+                    : i < currentIndex
+                      ? 'rgba(201,168,76,0.4)'
+                      : 'rgba(255,255,255,0.12)',
+                  transition: 'all 300ms ease',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* 3. 현재 진행도 숫자 표시 (예: 1 / 3) */}
+          <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
+            {currentIndex + 1} / {TOTAL}
+          </span>
+
+        </div>
+        {/* ▲ 오른쪽 UI 영역 끝 ▲ */}
+        
       </div>
 
       {/* Question card */}
@@ -363,6 +398,12 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
           {currentIndex < TOTAL - 1 ? '다음' : '결과 보기'}
         </button>
       </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: .5; }
+        }
+      `}</style>
     </div>
   );
 };
