@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { ALL_CHARACTERS, GRADE_COLORS, SUBJECT_ICONS, type GachaCharacter } from '@/lib/gachaSystem';
+import { ALL_CHARACTERS, GRADE_COLORS, type GachaCharacter } from '@/lib/gachaSystem';
 import CharacterDetailModal from './CharacterDetailModal';
 
 type GradeFilter = 'all' | 'S' | 'A' | 'B' | 'C';
@@ -51,14 +51,7 @@ const CollectionScreen: React.FC = () => {
         </p>
 
         {/* Progress bar */}
-        <div
-          style={{
-            height: 6,
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            borderRadius: 3,
-            overflow: 'hidden',
-          }}
-        >
+        <div style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
           <div
             style={{
               height: '100%',
@@ -72,15 +65,7 @@ const CollectionScreen: React.FC = () => {
       </div>
 
       {/* Filter row */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          padding: '0 16px 16px',
-          overflowX: 'auto',
-          scrollbarWidth: 'none',
-        }}
-      >
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -104,18 +89,10 @@ const CollectionScreen: React.FC = () => {
       </div>
 
       {/* Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 10,
-          padding: '0 16px',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '0 16px' }}>
         {filtered.map((char) => {
           const isOwned = ownedSet.has(char.id);
           const colors = GRADE_COLORS[char.grade];
-          const icon = SUBJECT_ICONS[char.subject] ?? '⭐';
 
           return (
             <button
@@ -135,12 +112,8 @@ const CollectionScreen: React.FC = () => {
                 position: 'relative',
                 transition: 'transform 150ms ease',
               }}
-              onMouseDown={(e) => {
-                if (isOwned) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)';
-              }}
-              onMouseUp={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-              }}
+              onMouseDown={(e) => { if (isOwned) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)'; }}
+              onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
             >
               {/* Grade badge */}
               <div
@@ -159,43 +132,49 @@ const CollectionScreen: React.FC = () => {
                 {isOwned ? char.grade : '?'}
               </div>
 
-              {/* Avatar circle */}
+              {/* Avatar circle (이미지 전용 태그 전환 완료 🖼️) */}
               <div
                 style={{
                   width: 56,
                   height: 56,
                   borderRadius: '50%',
-                  backgroundColor: isOwned
-                    ? `color-mix(in srgb, ${colors.bg} 60%, transparent)`
-                    : 'rgba(255,255,255,0.03)',
+                  backgroundColor: isOwned ? `color-mix(in srgb, ${colors.bg} 60%, transparent)` : 'rgba(255,255,255,0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 26,
                   marginTop: 4,
                   border: isOwned ? `1px solid ${colors.border}30` : '1px solid rgba(255,255,255,0.06)',
                   position: 'relative',
+                  overflow: 'hidden'
                 }}
               >
-                <span style={isOwned ? undefined : { filter: 'saturate(0) brightness(0.4) opacity(0.5)', userSelect: 'none' }}>
-                  {icon}
-                </span>
+                {/* 🖼️ 이미지가 연동된 메인 태그 구역 */}
+                <img 
+                  src={char.imageUrl} 
+                  alt={char.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    // 미획득 상태일 때 기획서 규격대로 완전 실루엣(검게 처리) 및 흑백 처리 
+                    ...(isOwned ? {} : { filter: 'saturate(0) brightness(0.2) opacity(0.4)', userSelect: 'none' })
+                  }}
+                  onError={(e) => {
+                    // 💡 혹시나 아직 public에 이미지를 안 넣었을 때 에러 아이콘 방지용 자동 깨짐 대처
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+
                 {!isOwned && (
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: -2,
-                      right: -2,
-                      width: 18,
-                      height: 18,
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(15,15,26,0.9)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      inset: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 9,
-                      color: 'rgba(255,255,255,0.35)',
+                      fontSize: 16,
+                      color: 'rgba(255,255,255,0.4)',
                       fontWeight: 700,
                     }}
                   >
@@ -205,28 +184,13 @@ const CollectionScreen: React.FC = () => {
               </div>
 
               {/* Name */}
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: isOwned ? '#FFFFFF' : 'rgba(255,255,255,0.2)',
-                  textAlign: 'center',
-                  lineHeight: 1.3,
-                  letterSpacing: isOwned ? undefined : '0.05em',
-                }}
-              >
+              <div style={{ fontSize: 11, fontWeight: 700, color: isOwned ? '#FFFFFF' : 'rgba(255,255,255,0.2)', textAlign: 'center', lineHeight: 1.3 }}>
                 {isOwned ? char.name : '? ? ?'}
               </div>
 
               {/* Subject */}
               {isOwned && (
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: 'rgba(255,255,255,0.35)',
-                    textAlign: 'center',
-                  }}
-                >
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
                   {char.subject}
                 </div>
               )}

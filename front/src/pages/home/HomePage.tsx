@@ -19,6 +19,7 @@ import QuizCreateModal from './components/QuizCreateModal';
 import QuizListModal from './components/QuizListModal';
 import StreakBonusModal from './components/StreakBonusModal';
 import BurnoutWarningModal from './components/BurnoutWarningModal';
+import { useUserStore } from '@/store/useUserStore';
 
 const BURNOUT_THRESHOLD_MINUTES = 180; // 3시간
 
@@ -177,6 +178,16 @@ const HomePage: React.FC = () => {
   const handleQuizSkip = () => setScreen('stat');
   const handleResultContinue = () => setScreen('stat');
   const handleStatDone = () => {
+    // 🧮 집중한 분량(savedElapsedSeconds)에 비례한 캐릭터 경험치 계산 (최소 10, 최대 45 EXP 제한)
+    const calculatedCharacterExp = Math.max(10, Math.min(45, Math.round(savedElapsedSeconds / 180)));
+
+    // 🧬 Zustand 창고를 직접 강제 호출하여 경험치를 먹이고 결과 토스트 알림을 터뜨립니다.
+    useUserStore.getState().gainEquippedCharacterExp(calculatedCharacterExp).then((res) => {
+      if (res.toast) {
+        showToast(res.toast); // 진화 알림 또는 경험치 획득 상태가 하단 토스트 팝업으로 연출됩니다.
+      }
+    });
+    
     setScreen('timer');
     setStatGained(null);
     setStatError(null);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type GachaCharacter, GRADE_COLORS, SUBJECT_ICONS } from '@/lib/gachaSystem';
+import { type GachaCharacter, GRADE_COLORS } from '@/lib/gachaSystem';
 
 interface CharacterDetailModalProps {
   character: GachaCharacter | null;
@@ -17,11 +17,7 @@ const SUBJECT_STAT_BOOST: Record<string, string[]> = {
   기타: ['PER +1', 'COL +1'],
 };
 
-const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({
-  character,
-  isOpen,
-  onClose,
-}) => {
+const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({ character, isOpen, onClose }) => {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -40,7 +36,6 @@ const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({
   if (!mounted || !character) return null;
 
   const colors = GRADE_COLORS[character.grade];
-  const icon = SUBJECT_ICONS[character.subject] ?? '⭐';
   const statBoosts = SUBJECT_STAT_BOOST[character.subject] ?? SUBJECT_STAT_BOOST['기타'];
 
   return (
@@ -93,8 +88,14 @@ const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({
           {character.grade}
         </div>
 
-        {/* Character icon */}
-        <div style={{ fontSize: 40 }}>{icon}</div>
+        {/* 🖼️ Character Image 연동 완료 */}
+        <div style={{ width: 100, height: 100, borderRadius: '50%', overflow: 'hidden', margin: '8px 0' }}>
+          <img 
+            src={character.imageUrl} 
+            alt={character.name} 
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
 
         {/* Name */}
         <h2 style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', margin: 0, textAlign: 'center' }}>
@@ -102,21 +103,12 @@ const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({
         </h2>
 
         {/* Subject pill */}
-        <div
-          style={{
-            backgroundColor: 'rgba(201,168,76,0.15)',
-            color: '#C9A84C',
-            borderRadius: 20,
-            padding: '4px 14px',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
+        <div style={{ backgroundColor: 'rgba(201,168,76,0.15)', color: '#C9A84C', borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 600 }}>
           {character.subject}
         </div>
 
         {/* Description */}
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', margin: '4px 0 8px', textAlign: 'center' }}>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', margin: '4px 0 8px', textAlign: 'center', lineHeight: 1.5 }}>
           {character.description}
         </p>
 
