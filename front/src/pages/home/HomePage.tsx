@@ -14,7 +14,6 @@ import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
 import QuestGoalModal from './components/QuestGoalModal';
-import { VerificationPopup } from './components/VerificationPopup';
 import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
 import QuizCreateModal from './components/QuizCreateModal';
 import QuizListModal from './components/QuizListModal';
@@ -71,7 +70,6 @@ const HomePage: React.FC = () => {
   const [screen, setScreen] = useState<HomeScreen>('timer');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
-  const [showVerification, setShowVerification] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
   const [quizCorrectCount, setQuizCorrectCount] = useState(0);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
@@ -160,11 +158,7 @@ const HomePage: React.FC = () => {
       resetTimer();
     }
 
-    if (Math.random() < 0.5) {
-      setShowVerification(true);
-    } else {
-      setScreen('quiz');
-    }
+    setScreen('quiz');
   };
 
   const handleModalClose = () => {
@@ -401,20 +395,6 @@ const HomePage: React.FC = () => {
         onSave={handleQuestGoalSave}
         onClose={() => setIsQuestModalOpen(false)}
       />
-
-      {/* AI 검증 팝업 */}
-      {showVerification && (
-        <VerificationPopup
-          onSuccess={() => {
-            setShowVerification(false);
-            setScreen('quiz');
-          }}
-          onCancel={() => {
-            setShowVerification(false);
-            resetTimer();
-          }}
-        />
-      )}
 
       {/* Streak bonus modal */}
       {showStreakBonus && (
