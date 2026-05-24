@@ -250,7 +250,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
             display: 'flex', alignItems: 'center', gap: 6, 
             color: timeLeft <= 10 ? '#EF4444' : '#FBBF24',
             fontWeight: 700, fontSize: 15,
-            animation: timeLeft <= 10 ? 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
+            animation: timeLeft <= 10 ? 'quizTimerPulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
           }}>
             <Clock size={16} />
             {timeLeft}초
