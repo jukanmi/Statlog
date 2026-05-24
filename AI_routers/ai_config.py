@@ -22,8 +22,8 @@ def _load_prompts() -> dict:
         "quiz_json_schema": quiz_schema,
         "quiz_instruction": raw["quiz_instruction"].format(schema=quiz_schema).strip(),
         "quiz_retry_instruction": raw["quiz_retry_instruction"].format(schema=quiz_schema).strip(),
-        # 부분 재요청 프롬프트는 런타임에 누락 분류 라벨로 {missing} 치환을 또 거친다.
-        # yaml에서 {{missing}} → .format(schema=...) 후 {missing}로 살아남는다.
+        # 부분 재요청 프롬프트는 런타임에 누락 분류 라벨로 <<MISSING>> 치환을 또 거친다.
+        # yaml에서 <<MISSING>>으로 작성된 부분이 .replace()를 통해 치환된다.
         "quiz_partial_retry_instruction": raw["quiz_partial_retry_instruction"]
             .format(schema=quiz_schema)
             .strip(),
