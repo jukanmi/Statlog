@@ -399,7 +399,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
         </button>
       </div>
       <style>{`
-        @keyframes pulse {
+        @keyframes quizTimerPulse {
           0%, 100% { opacity: 1; }
           50% { opacity: .5; }
         }
