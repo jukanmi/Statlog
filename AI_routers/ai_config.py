@@ -22,6 +22,11 @@ def _load_prompts() -> dict:
         "quiz_json_schema": quiz_schema,
         "quiz_instruction": raw["quiz_instruction"].format(schema=quiz_schema).strip(),
         "quiz_retry_instruction": raw["quiz_retry_instruction"].format(schema=quiz_schema).strip(),
+        # 부분 재요청 프롬프트는 런타임에 누락 분류 라벨로 {missing} 치환을 또 거친다.
+        # yaml에서 {{missing}} → .format(schema=...) 후 {missing}로 살아남는다.
+        "quiz_partial_retry_instruction": raw["quiz_partial_retry_instruction"]
+            .format(schema=quiz_schema)
+            .strip(),
     }
 
 
@@ -42,6 +47,13 @@ class Settings:
     QUIZ_TIMEOUT: float = float(os.getenv("QUIZ_TIMEOUT", "90"))
     # 스탯 1포인트당 부여할 경험치 (EXP 계산에 사용)
     EXP_PER_STAT_POINT: int = int(os.getenv("EXP_PER_STAT_POINT", "10"))
+    # 학습 깊이(암기/이해/응용)에 따른 EXP 가중치
+    EXP_DEPTH_WEIGHT_MEMORIZE: float = float(os.getenv("EXP_DEPTH_WEIGHT_MEMORIZE", "1.0"))
+    EXP_DEPTH_WEIGHT_UNDERSTAND: float = float(os.getenv("EXP_DEPTH_WEIGHT_UNDERSTAND", "1.3"))
+    EXP_DEPTH_WEIGHT_APPLY: float = float(os.getenv("EXP_DEPTH_WEIGHT_APPLY", "1.6"))
+    # 퀴즈 정답 수가 이 값 미만이면 LLM 분석을 건너뛰고 스탯·EXP를 모두 0으로 반환한다.
+    # 기본 1 — 3문제를 모두 틀리면 학습으로 인정하지 않는다.
+    QUIZ_MIN_CORRECT_FOR_STATS: int = int(os.getenv("QUIZ_MIN_CORRECT_FOR_STATS", "1"))
     # 학습 시간(분) → 총 스탯량 로그 곡선 파라미터
     # budget = MAX * g / (g + OFFSET),  g = ln(1 + minutes / SCALE)
     MAX_STAT_BUDGET: float = float(os.getenv("MAX_STAT_BUDGET", "10"))      # 시간이 매우 길어질 때 근접하는 상한
