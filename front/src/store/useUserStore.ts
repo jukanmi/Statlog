@@ -102,30 +102,33 @@ export const useUserStore = create<UserState>()(
 
       // 경험치 가산 및 실시간 진화 판독 처리 액션 코드
       gainEquippedCharacterExp: async (amount) => {
-        const { equippedCharacterId, characterExpMap, ownedCharacterIds } = get();
-        if (!equippedCharacterId) return { evolved: false, toast: null };
+        const initialEquippedId = get().equippedCharacterId;
+        if (!initialEquippedId) return { evolved: false, toast: null };
 
         // 📡 백엔드 연동용 API 비동기 정산 요청 호출
         try {  
-          await updateCharacterExpOnServer({ characterId: equippedCharacterId, expGained: amount });  
+          await updateCharacterExpOnServer({ characterId: initialEquippedId, expGained: amount });  
         } catch (error) {  
           console.error("Failed to sync character exp with server:", error);  
         } 
 
-        const currentExp = (characterExpMap[equippedCharacterId] || 0) + amount;
-        const nextEvolutionId = EVOLUTION_CHAIN[equippedCharacterId];
+        // 비동기 작업 이후 최신 상태를 다시 가져와 레이스 컨디션을 방지합니다.  
+        const { characterExpMap, ownedCharacterIds, equippedCharacterId } = get();  
+        const currentExp = (characterExpMap[initialEquippedId] || 0) + amount;
+        const nextEvolutionId = EVOLUTION_CHAIN[initialEquippedId];
 
         // 🎯 경험치 커트라인 100점 돌파 및 진화체가 지정되어 있을 때
         if (currentExp >= 100 && nextEvolutionId && !ownedCharacterIds.includes(nextEvolutionId)) {
           const evolvedCharacter = ALL_CHARACTERS.find(c => c.id === nextEvolutionId);
           const leftoverExp = currentExp - 100;  
-          const updatedExpMap = { ...characterExpMap, [equippedCharacterId]: 0, [nextEvolutionId]: leftoverExp };  
+          const updatedExpMap = { ...characterExpMap, [initialEquippedId]: 0, [nextEvolutionId]: leftoverExp };  
           const updatedOwnedIds = Array.from(new Set([...ownedCharacterIds, nextEvolutionId]));
+          const shouldUpdateEquipped = equippedCharacterId === initialEquippedId;
 
           set({
             characterExpMap: updatedExpMap,
             ownedCharacterIds: updatedOwnedIds,
-            equippedCharacterId: nextEvolutionId // 대표 착용 캐릭터 즉시 자동 교체 진화!
+            ...(shouldUpdateEquipped ? { equippedCharacterId: nextEvolutionId } : {})
           });
 
           return {
@@ -137,7 +140,7 @@ export const useUserStore = create<UserState>()(
           set({
             characterExpMap: {
               ...characterExpMap,
-              [equippedCharacterId]: Math.min(100, currentExp) // 맥시멈 100 제한선
+              [initialEquippedId]: Math.min(100, currentExp) 
             }
           });
           return { evolved: false, toast: `✨ 착용 중인 캐릭터가 보상 EXP +${amount}를 획득했습니다. (${Math.min(100, currentExp)}/100)` };
