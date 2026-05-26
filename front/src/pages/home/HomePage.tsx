@@ -176,7 +176,9 @@ const HomePage: React.FC = () => {
   const handleQuizSkip = () => setScreen('stat');
   const handleResultContinue = () => setScreen('stat');
   const handleStatDone = () => {
-    const calculatedCharacterExp = Math.max(10, Math.min(45, Math.round(savedElapsedSeconds / 180)));
+  const calculatedCharacterExp = savedElapsedSeconds < 60 
+      ? 0 
+      : Math.max(10, Math.min(45, Math.round(savedElapsedSeconds / 180)));
 
     useUserStore.getState().gainEquippedCharacterExp(calculatedCharacterExp).then((res) => {
       if (res.toast) {
