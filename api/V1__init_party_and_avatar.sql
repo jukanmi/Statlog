@@ -1,24 +1,32 @@
 -- Party Tables
 CREATE TABLE parties (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY NOT NULL,
     name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    leader_user_id VARCHAR(36),
+    max_member_count INTEGER DEFAULT 6,
+    status VARCHAR(20) DEFAULT 'RECRUITING',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    FOREIGN KEY (leader_user_id) REFERENCES users(id)
 );
 
 CREATE TABLE party_members (
-    party_id VARCHAR(36) NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
+    party_id VARCHAR(36) NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES users(id),
     role VARCHAR(20) DEFAULT 'MEMBER',
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (party_id, user_id),
-    FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (party_id, user_id)
 );
 
 CREATE TABLE party_invites (
-    invite_code VARCHAR(36) PRIMARY KEY,
-    party_id VARCHAR(36) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE
+    invite_code VARCHAR(36) PRIMARY KEY NOT NULL,
+    party_id VARCHAR(36) NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
+    created_by VARCHAR(36) REFERENCES users(id),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_count INTEGER DEFAULT 0,
+    max_use_count INTEGER DEFAULT 100,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Avatar (도감) Tables
