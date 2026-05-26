@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.users import get_current_user
-# TODO: 아래 User 모델은 실제 User 모델로 교체해야 합니다.
 from models.user import User
 from core.db import get_db
 from schemas.party import (

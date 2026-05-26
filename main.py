@@ -1,3 +1,9 @@
+import sys
+import os
+
+# backend 폴더 내부의 모듈(api, core, models 등)을 루트에서도 찾을 수 있도록 경로 추가
+sys.path.append(os.path.join(os.path.dirname(__file__), "backend"))
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException

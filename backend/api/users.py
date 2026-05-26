@@ -3,11 +3,18 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.security import decode_access_token
 from schemas.user import serialize_user
+from models.user import User
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
 bearer_scheme = HTTPBearer()
 
+
+# TODO: 실제 DB를 연동하여 유저 정보를 조회하는 로직으로 교체해야 합니다.
+async def get_user_by_id(user_id: str):
+    # Mock 유저 객체 반환 (임시)
+    user = User(id=user_id, nickname="테스트유저")
+    return user
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
