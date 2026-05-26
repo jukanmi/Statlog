@@ -9,6 +9,7 @@ import PokedexPage from './pages/pokedex/PokedexPage';
 import PartyPage from './pages/party/PartyPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import AttendanceModal from './components/AttendanceModal';
+import ConsentModal from './components/ConsentModal';
 import { useUserStore } from './store/useUserStore';
 import { useStudyStore } from './store/useStudyStore';
 
@@ -74,6 +75,7 @@ const App: React.FC = () => {
       </div>
       <BottomTabBar />
       {showAttendance && <AttendanceModal onClose={() => setShowAttendance(false)} />}
+      <ConsentModal />
     </div>
   );
 };

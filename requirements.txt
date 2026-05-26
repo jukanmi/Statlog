@@ -1,0 +1,22 @@
+# Statlog API 백엔드 의존성
+# 설치: pip install -r requirements.txt
+
+# --- 웹 프레임워크 / 서버 ---
+fastapi==0.115.6  
+uvicorn==0.34.0  
+
+# --- 데이터 검증 / 설정 ---  
+pydantic==2.10.4  
+pydantic-settings==2.7.0
+python-dotenv==1.2.1
+PyYAML==6.0.3
+
+# --- HTTP 클라이언트 (GCP AI 서버, OAuth 연동) ---
+httpx==0.28.1
+
+# --- 인증 (JWT) ---
+python-jose[cryptography]==3.3.0
+
+# --- AWS S3 (test_s3_presign.py) ---
+boto3==1.35.99
+requests==2.32.5

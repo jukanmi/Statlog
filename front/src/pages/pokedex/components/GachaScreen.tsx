@@ -48,6 +48,7 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
   const [result, setResult] = useState<GachaResult | null>(null);
   const [isResultOpen, setIsResultOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<'gems' | 'gold'>('gems');
 
   useEffect(() => {
     if (toast) {
@@ -56,15 +57,27 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
     }
   }, [toast]);
 
-  const handlePull = (count: 1 | 10) => {
-    const cost = count === 1 ? 10 : 90;
-    if (gems < cost) {
-      setToast('소환석이 부족해요 💎');
-      return;
-    }
+  const GEM_COSTS = { single: 10, ten: 90 };
+  const GOLD_COSTS = { single: 500, ten: 4500 };
 
+  const handlePull = (count: 1 | 10) => {
     const prevOwned = new Set(ownedCharacterIds);
-    updateCurrency(undefined, gems - cost);
+
+    if (currency === 'gems') {
+      const cost = count === 1 ? GEM_COSTS.single : GEM_COSTS.ten;
+      if (gems < cost) {
+        setToast('소환석이 부족해요 💎');
+        return;
+      }
+      updateCurrency(undefined, gems - cost);
+    } else {
+      const cost = count === 1 ? GOLD_COSTS.single : GOLD_COSTS.ten;
+      if (gold < cost) {
+        setToast('골드가 부족해요 🪙');
+        return;
+      }
+      updateCurrency(gold - cost, undefined);
+    }
 
     const characters = count === 1 ? [pullOne()] : pullTen();
     characters.forEach((c) => addCharacter(c.id));
@@ -124,6 +137,25 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
           공부하면 소환석이 쌓여요
         </p>
+      </div>
+
+      {/* Currency type toggle */}
+      <div style={{ display: 'flex', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 4 }}>
+        {(['gems', 'gold'] as const).map((c) => (
+          <button
+            key={c}
+            onClick={() => setCurrency(c)}
+            style={{
+              borderRadius: 16, padding: '6px 16px', fontSize: 13, fontWeight: 600,
+              border: 'none', cursor: 'pointer',
+              background: currency === c ? (c === 'gems' ? '#A78BFA' : '#C9A84C') : 'transparent',
+              color: currency === c ? '#000' : 'rgba(255,255,255,0.4)',
+              transition: 'all 150ms ease',
+            }}
+          >
+            {c === 'gems' ? '💎 소환석' : '🪙 골드'}
+          </button>
+        ))}
       </div>
 
       {/* Currency row */}
@@ -204,7 +236,7 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
             width: 140,
             height: 48,
             backgroundColor: 'transparent',
-            border: '1.5px solid #C9A84C',
+            border: `1.5px solid ${currency === 'gems' ? '#A78BFA' : '#C9A84C'}`,
             borderRadius: 24,
             color: '#FFFFFF',
             fontSize: 14,
@@ -219,7 +251,7 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
           onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.96)'; }}
           onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
         >
-          1회 소환 &nbsp;💎 10
+          {currency === 'gems' ? '1회 소환  💎 10' : '1회 소환  🪙 500'}
         </button>
 
         <button
@@ -227,7 +259,7 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
           style={{
             width: 140,
             height: 48,
-            backgroundColor: '#C9A84C',
+            backgroundColor: currency === 'gems' ? '#A78BFA' : '#C9A84C',
             border: 'none',
             borderRadius: 24,
             color: '#0F0F1A',
@@ -238,15 +270,22 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
             alignItems: 'center',
             justifyContent: 'center',
             gap: 4,
-            boxShadow: '0 0 20px rgba(201,168,76,0.35)',
+            boxShadow: currency === 'gems'
+              ? '0 0 20px rgba(167,139,250,0.35)'
+              : '0 0 20px rgba(201,168,76,0.35)',
             transition: 'transform 150ms ease',
           }}
           onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.96)'; }}
           onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
         >
-          10회 소환 &nbsp;💎 90
+          {currency === 'gems' ? '10회  💎 90' : '10회  🪙 4,500'}
         </button>
       </div>
+      {currency === 'gold' && (
+        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center' }}>
+          골드 소환은 소환석 소환과 동일 확률이에요
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

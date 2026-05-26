@@ -4,6 +4,7 @@ import StatRadarChart from './components/StatRadarChart';
 import StudyBarChart from './components/StudyBarChart';
 import SubjectStats from './components/SubjectStats';
 import CurrencyCard from './components/CurrencyCard';
+import RankingCard from './components/RankingCard';
 import SettingsModal from './components/SettingsModal';
 
 interface DashboardPageProps {
@@ -26,6 +27,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
         <ProfileCard onSettingsClick={() => setShowSettings(true)} />
         <StatRadarChart />
         <StudyBarChart />
+        <RankingCard />
         <SubjectStats />
         <CurrencyCard />
       </div>
