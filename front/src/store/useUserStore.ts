@@ -106,15 +106,20 @@ export const useUserStore = create<UserState>()(
         if (!equippedCharacterId) return { evolved: false, toast: null };
 
         // 📡 백엔드 연동용 API 비동기 정산 요청 호출
-        await updateCharacterExpOnServer({ characterId: equippedCharacterId, expGained: amount });
+        try {  
+          await updateCharacterExpOnServer({ characterId: equippedCharacterId, expGained: amount });  
+        } catch (error) {  
+          console.error("Failed to sync character exp with server:", error);  
+        } 
 
         const currentExp = (characterExpMap[equippedCharacterId] || 0) + amount;
         const nextEvolutionId = EVOLUTION_CHAIN[equippedCharacterId];
 
         // 🎯 경험치 커트라인 100점 돌파 및 진화체가 지정되어 있을 때
-        if (currentExp >= 100 && nextEvolutionId) {
+        if (currentExp >= 100 && nextEvolutionId && !ownedCharacterIds.includes(nextEvolutionId)) {
           const evolvedCharacter = ALL_CHARACTERS.find(c => c.id === nextEvolutionId);
-          const updatedExpMap = { ...characterExpMap, [equippedCharacterId]: 0, [nextEvolutionId]: 0 };
+          const leftoverExp = currentExp - 100;  
+          const updatedExpMap = { ...characterExpMap, [equippedCharacterId]: 0, [nextEvolutionId]: leftoverExp };  
           const updatedOwnedIds = Array.from(new Set([...ownedCharacterIds, nextEvolutionId]));
 
           set({
