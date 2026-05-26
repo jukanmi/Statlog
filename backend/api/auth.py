@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
+# TODO: DB 연동 후 실제 DB 기반 유저 생성 및 리프레시 토큰 저장 로직으로 교체해야 합니다.
+async def get_or_create_user_from_oauth(oauth_user: dict):
+    raise HTTPException(status_code=501, detail="유저 생성 및 조회 로직이 아직 구현되지 않았습니다.")
+
+async def save_refresh_token(user_id: str, token_hash: str, expires_at: datetime):
+    pass  # 위 함수에서 501 에러가 발생하므로 여기서는 일단 pass 처리합니다.
+
 Provider = Literal["kakao", "google"]
 
 

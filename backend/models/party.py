@@ -4,10 +4,7 @@ from sqlalchemy import Column, String, DateTime, Enum, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-# from core.db import Base  # TODO: 공통 Base 모델 임포트
-from sqlalchemy.orm import declarative_base
-Base = declarative_base()
-
+from core.db import Base
 
 class PartyRole(str, enum.Enum):
     LEADER = "LEADER"
