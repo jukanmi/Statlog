@@ -20,6 +20,7 @@ import QuizListModal from './components/QuizListModal';
 import StreakBonusModal from './components/StreakBonusModal';
 import BurnoutWarningModal from './components/BurnoutWarningModal';
 import { useUserStore } from '@/store/useUserStore';
+import { ALL_CHARACTERS } from '@/lib/gachaSystem'; // 🦉 캐릭터 리스트 임포트
 
 const BURNOUT_THRESHOLD_MINUTES = 180; // 3시간
 
@@ -32,7 +33,10 @@ const HomePage: React.FC = () => {
   const studyStreak = useStudyStore((s) => s.studyStreak);
   const streakBonusPending = useStudyStore((s) => s.streakBonusPending);
 
-  // TAGS: Hook, Quest, State, Sync
+  // 🧬 장착된 대표 캐릭터 정보 스토어에서 실시간 구독
+  const equippedCharacterId = useUserStore((s) => s.equippedCharacterId);
+  const currentCharacter = ALL_CHARACTERS.find(c => c.id === equippedCharacterId);
+
   const {
     dailyQuestStatus,
     claimDailyQuest,
@@ -46,7 +50,6 @@ const HomePage: React.FC = () => {
     checkQuestReset();
   }, [checkQuestReset]);
 
-  // --- Pomodoro / Timer state ---
   const {
     timerMode,
     pomPhase,
@@ -67,7 +70,6 @@ const HomePage: React.FC = () => {
     switchMode,
   } = usePomodoroTimer();
 
-  // --- Screen / modal state ---
   const [screen, setScreen] = useState<HomeScreen>('timer');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
@@ -80,7 +82,6 @@ const HomePage: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const burnoutShownRef = useRef(false);
 
-  // --- AI 스탯 변환 상태 ---
   const [statGained, setStatGained] = useState<StatConversionResult | null>(null);
   const [statLoading, setStatLoading] = useState(false);
   const [statError, setStatError] = useState<string | null>(null);
@@ -90,7 +91,6 @@ const HomePage: React.FC = () => {
     setTimeout(() => setToastMsg(null), 2500);
   };
 
-  // 번아웃 위험 감지
   useEffect(() => {
     if (!burnoutShownRef.current && todayMinutes >= BURNOUT_THRESHOLD_MINUTES) {
       burnoutShownRef.current = true;
@@ -98,7 +98,6 @@ const HomePage: React.FC = () => {
     }
   }, [todayMinutes]);
 
-  // 퀴즈를 맞췄을 때 백엔드 AI에 학습 내용을 보내 stat_gained를 받아온다
   const fetchStatGained = async (elapsed: number) => {
     setStatLoading(true);
     setStatError(null);
@@ -143,7 +142,6 @@ const HomePage: React.FC = () => {
     updateDailyStudyGoal(minutes, subject);
   };
 
-  // --- Handlers ---
   const handleStop = () => {
     stopTimer();
     setIsModalOpen(true);
@@ -178,13 +176,11 @@ const HomePage: React.FC = () => {
   const handleQuizSkip = () => setScreen('stat');
   const handleResultContinue = () => setScreen('stat');
   const handleStatDone = () => {
-    // 🧮 집중한 분량(savedElapsedSeconds)에 비례한 캐릭터 경험치 계산 (최소 10, 최대 45 EXP 제한)
     const calculatedCharacterExp = Math.max(10, Math.min(45, Math.round(savedElapsedSeconds / 180)));
 
-    // 🧬 Zustand 창고를 직접 강제 호출하여 경험치를 먹이고 결과 토스트 알림을 터뜨립니다.
     useUserStore.getState().gainEquippedCharacterExp(calculatedCharacterExp).then((res) => {
       if (res.toast) {
-        showToast(res.toast); // 진화 알림 또는 경험치 획득 상태가 하단 토스트 팝업으로 연출됩니다.
+        showToast(res.toast);
       }
     });
     
@@ -200,7 +196,6 @@ const HomePage: React.FC = () => {
     setScreen('quiz');
   };
 
-  // --- Non-timer screens ---
   if (screen === 'quiz') {
     return (
       <QuizScreen
@@ -233,7 +228,6 @@ const HomePage: React.FC = () => {
     );
   }
 
-  // --- Derived display values ---
   const isPomodoro = timerMode === 'pomodoro';
   const isBreak = isPomodoro && pomPhase === 'break';
   const ringColor = isBreak ? 'purple' : 'gold';
@@ -245,7 +239,6 @@ const HomePage: React.FC = () => {
     ? 'radial-gradient(circle, rgba(167,139,250,0.07) 0%, transparent 70%)'
     : 'radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 70%)';
 
-  // --- Timer screen ---
   return (
     <div
       style={{
@@ -318,6 +311,18 @@ const HomePage: React.FC = () => {
       {/* Spacer */}
       {(!isPomodoro || !isActive || pomNotice) && isActive && (
         <div style={{ marginBottom: 24 }} />
+      )}
+
+      {/* 🦉 임시 UI: 장착한 대표 캐릭터 홈 화면 표시 레이아웃 */}
+      {currentCharacter && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16, zIndex: 10, gap: 4 }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', border: '2px solid #C9A84C', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+            <img src={currentCharacter.imageUrl} alt={currentCharacter.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600, backgroundColor: 'rgba(0,0,0,0.4)', padding: '2px 8px', borderRadius: 10 }}>
+            {currentCharacter.name} (동행 중)
+          </span>
+        </div>
       )}
 
       {/* Timer ring */}
