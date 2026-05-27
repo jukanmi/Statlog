@@ -11,7 +11,9 @@ from schemas import party as party_schemas
 
 def get_user_active_party(db: Session, user_id: str) -> Optional[party_models.Party]:
     """사용자가 속한 활성(RECRUITING, ACTIVE) 파티를 조회합니다."""
-    member_info = db.query(party_models.PartyMember).options(joinedload(party_models.PartyMember.party)).filter(
+    member_info = db.query(party_models.PartyMember).join(party_models.PartyMember.party).options(
+        joinedload(party_models.PartyMember.party)
+    ).filter(
         party_models.PartyMember.user_id == user_id,
         party_models.Party.status.in_([party_models.PartyStatus.RECRUITING, party_models.PartyStatus.ACTIVE])
     ).first()
@@ -123,7 +125,7 @@ def get_invite(db: Session, invite_code: str) -> Optional[party_models.PartyInvi
     if not invite:
         return None
 
-    if invite.status != party_models.InviteStatus.ACTIVE or invite.expires_at < datetime.now(timezone.utc):
+    if invite.status == party_models.InviteStatus.ACTIVE and invite.expires_at < datetime.now(timezone.utc):
         invite.status = party_models.InviteStatus.EXPIRED
         db.commit()
         db.refresh(invite)

@@ -12,14 +12,14 @@ from services import party_service
 router = APIRouter(tags=["Parties"])
 
 @router.get("/parties/me", response_model=PartyResponse)
-async def get_my_party(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_party(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     party = party_service.get_user_active_party(db, user_id=current_user.id)
     if not party:
         raise HTTPException(status_code=404, detail="가입한 파티가 없습니다.")
     return party
 
 @router.post("/parties", response_model=PartyResponse)
-async def create_party(body: PartyCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_party(body: PartyCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.create_party(db, user=current_user, name=body.name, max_member_count=body.max_member_count)
         return party
@@ -29,7 +29,7 @@ async def create_party(body: PartyCreate, db: Session = Depends(get_db), current
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/parties/{party_id}/join", response_model=PartyResponse)
-async def join_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def join_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.join_party(db, user=current_user, party_id=party_id)
         return party
@@ -44,14 +44,14 @@ async def join_party(party_id: str, db: Session = Depends(get_db), current_user:
         raise HTTPException(status_code=status_code, detail=detail)
 
 @router.get("/parties/{party_id}", response_model=PartyResponse)
-async def get_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     party = party_service.get_party(db, party_id=party_id)
     if not party:
         raise HTTPException(status_code=404, detail="파티를 찾을 수 없습니다.")
     return party
 
 @router.delete("/parties/{party_id}/members/me", status_code=204)
-async def leave_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def leave_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party_service.leave_party(db, user=current_user, party_id=party_id)
     except ValueError as e:
@@ -62,7 +62,7 @@ async def leave_party(party_id: str, db: Session = Depends(get_db), current_user
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/parties/{party_id}/invites", response_model=PartyInviteResponse)
-async def create_invite(party_id: str, body: PartyInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_invite(party_id: str, body: PartyInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         invite = party_service.create_invite(db, user=current_user, party_id=party_id, expires_in_days=body.expires_in_days, max_use_count=body.max_use_count)
         return invite
@@ -72,14 +72,14 @@ async def create_invite(party_id: str, body: PartyInviteCreate, db: Session = De
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/party-invites/{invite_code}", response_model=PartyInviteResponse)
-async def get_invite(invite_code: str, db: Session = Depends(get_db)):
+def get_invite(invite_code: str, db: Session = Depends(get_db)):
     invite = party_service.get_invite(db, invite_code=invite_code)
     if not invite:
         raise HTTPException(status_code=404, detail="유효하지 않은 초대코드입니다.")
     return invite
 
 @router.post("/party-invites/{invite_code}/join", response_model=PartyResponse)
-async def join_party_by_invite(invite_code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def join_party_by_invite(invite_code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.join_party_by_invite(db, user=current_user, invite_code=invite_code)
         return party

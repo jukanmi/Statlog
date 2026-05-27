@@ -34,7 +34,7 @@ class Party(Base):
 class PartyMember(Base):
     __tablename__ = "party_members"
     party_id = Column(String(36), ForeignKey("parties.id", ondelete="CASCADE"), primary_key=True)
-    user_id = Column(String(36), ForeignKey("users.id"), primary_key=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role = Column(Enum(PartyRole), default=PartyRole.MEMBER)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 

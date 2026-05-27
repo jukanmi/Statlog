@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from models.party import PartyRole, PartyStatus
 
 class PartyCreate(BaseModel):
-    name: str
-    max_member_count: int = 6
+    name: str = Field(..., min_length=1, max_length=100)
+    max_member_count: int = Field(default=6, gt=0, le=100)
 
 class PartyMemberResponse(BaseModel):
     user_id: str
@@ -29,8 +29,8 @@ class PartyResponse(BaseModel):
         from_attributes = True
 
 class PartyInviteCreate(BaseModel):
-    expires_in_days: int = 7
-    max_use_count: int = 100
+    expires_in_days: int = Field(default=7, gt=0, le=365)
+    max_use_count: int = Field(default=100, gt=0, le=1000)
 
 class PartyInviteResponse(BaseModel):
     invite_code: str
