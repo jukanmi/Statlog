@@ -1,5 +1,15 @@
 import { useQuizStore } from '@/store/useQuizStore';
-import type { Quiz } from '@/types';
+
+export type Quiz = {
+  id?: string;
+  type?: 'multiple' | 'short';
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+  answer?: string;
+  hint?: string;
+};
 
 type QuizBank = { question: string; options: string[]; correctIndex: number }[];
 

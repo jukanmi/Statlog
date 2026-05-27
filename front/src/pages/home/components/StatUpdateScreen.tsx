@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats } from '@/types';
+import { useStudyStore } from '@/store/useStudyStore';
+import type { Stats, AIStats } from '@/types';
 import type { StatConversionResult } from '@/lib/api';
 
 interface StatUpdateScreenProps {
@@ -13,30 +14,33 @@ interface StatUpdateScreenProps {
 }
 
 type StatKey = keyof Stats;
+type AIStatKey = keyof AIStats;
 
 interface StatGain {
-  key: StatKey;
+  key: AIStatKey;
   delta: number;
 }
 
 const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART'];
 
-const STAT_LABELS: Record<StatKey, string> = {
+const STAT_LABELS: Record<AIStatKey, string> = {
   HUM: '인문학',
   SOC: '사회과학',
   NAT: '자연과학',
   COL: '협동력',
   PER: '끈기',
   ART: '예체능',
+  EXP: '실행경험',
 };
 
-const STAT_ICONS: Record<StatKey, string> = {
+const STAT_ICONS: Record<AIStatKey, string> = {
   HUM: '📖',
   SOC: '🏛️',
   NAT: '🔬',
   COL: '🤝',
   PER: '🔥',
   ART: '🎨',
+  EXP: '🚀',
 };
 
 function formatDuration(seconds: number): string {
@@ -56,37 +60,57 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
   onDone,
 }) => {
   const userStats = useUserStore((s) => s.user.stats);
+  const userAIStats = useUserStore((s) => s.user.aiStats);
   const addStats = useUserStore((s) => s.addStats);
+  const addAIStats = useUserStore((s) => s.addAIStats);
   const addExp = useUserStore((s) => s.addExp);
+  const lastSessionStats = useStudyStore((s) => s.lastSessionStats);
+  
   const [animated, setAnimated] = useState(false);
   const [applied, setApplied] = useState(false);
 
-  // AI가 반환한 능력치 중 0보다 큰 항목만 추출
-  const statGains: StatGain[] = statGained
-    ? STAT_KEYS.map((key) => ({ key, delta: statGained[key] ?? 0 })).filter(
-        (g) => g.delta > 0
-      )
-    : [];
-  const expGained = statGained?.EXP ?? 0;
+  // AI가 반환한 능력치 중 0보다 큰 항목만 추출 (Prop 우선, 없으면 Store 확인)
+  const statGains: StatGain[] = [];
+  
+  if (statGained) {
+    STAT_KEYS.forEach((key) => {
+      if ((statGained[key] ?? 0) > 0) {
+        statGains.push({ key, delta: statGained[key] ?? 0 });
+      }
+    });
+  } else if (lastSessionStats) {
+    (Object.entries(lastSessionStats) as [AIStatKey, number][]).forEach(([key, delta]) => {
+      if (delta > 0) {
+        statGains.push({ key, delta });
+      }
+    });
+  }
 
-  // statGained가 도착하면 단 한 번만 스토어에 반영
+  const expGained = statGained?.EXP ?? lastSessionStats?.EXP ?? 0;
+
+  // statGained나 lastSessionStats가 도착하면 단 한 번만 스토어에 반영
   useEffect(() => {
-    if (statGained && !applied) {
-      addStats(
-        STAT_KEYS.reduce<Partial<Stats>>((acc, key) => {
-          acc[key] = statGained[key] ?? 0;
-          return acc;
-        }, {})
-      );
-      addExp(statGained.EXP ?? 0);
-      setApplied(true);
+    if (!applied) {
+      if (statGained) {
+        addStats(
+          STAT_KEYS.reduce<Partial<Stats>>((acc, key) => {
+            acc[key] = statGained[key] ?? 0;
+            return acc;
+          }, {})
+        );
+        addExp(statGained.EXP ?? 0);
+        setApplied(true);
+      } else if (lastSessionStats) {
+        addAIStats(lastSessionStats);
+        setApplied(true);
+      }
     }
-  }, [statGained, applied, addStats, addExp]);
+  }, [statGained, lastSessionStats, applied, addStats, addAIStats, addExp]);
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 150);
     return () => clearTimeout(t);
-  }, []);
+  }, [statGained, lastSessionStats]);
 
   const containerStyle: React.CSSProperties = {
     position: 'fixed',
@@ -216,88 +240,93 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
       {/* Stat cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, overflowY: 'auto' }}>
         {statGains.map(({ key, delta }) => {
-          const currentValue = userStats[key] ?? 0;
-          const targetValue = Math.min(currentValue, 100);
-          const barWidth = animated ? `${targetValue}%` : '0%';
+          // Use userStats if it's a standard stat, else userAIStats
+          const currentValue = STAT_KEYS.includes(key as StatKey) 
+            ? userStats[key as StatKey] 
+            : userAIStats[key as AIStatKey] ?? 0;
+          
+          const barWidth = animated ? `${Math.min(currentValue, 100)}%` : '0%';
 
-          return (
-            <div
-              key={key}
-              style={{
-                backgroundColor: '#1A1A2E',
-                borderRadius: 16,
-                padding: '18px 20px',
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-            >
-              {/* Row: icon + name on left, +delta on right */}
+            return (
               <div
+                key={key}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 12,
+                  backgroundColor: '#1A1A2E',
+                  borderRadius: 16,
+                  padding: '18px 20px',
+                  border: '1px solid rgba(255,255,255,0.08)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 22 }}>{STAT_ICONS[key]}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>{key}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-                      {STAT_LABELS[key]}
-                    </div>
-                  </div>
-                </div>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 4,
-                    color: '#C9A84C',
-                    fontWeight: 700,
-                    fontSize: 18,
+                    justifyContent: 'space-between',
+                    marginBottom: 12,
                   }}
                 >
-                  <span style={{ fontSize: 14 }}>↑</span>
-                  <span>+{delta}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>{STAT_ICONS[key]}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF' }}>{key}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                        {STAT_LABELS[key]}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      color: '#C9A84C',
+                      fontWeight: 700,
+                      fontSize: 18,
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>↑</span>
+                    <span>+{delta}%</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Progress bar */}
-              <div
-                style={{
-                  height: 6,
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                }}
-              >
                 <div
                   style={{
-                    height: '100%',
-                    width: barWidth,
-                    background: 'linear-gradient(90deg, #C9A84C 0%, #E8CC7A 100%)',
+                    height: 6,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
                     borderRadius: 3,
-                    transition: 'width 600ms ease-out',
+                    overflow: 'hidden',
                   }}
-                />
-              </div>
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: barWidth,
+                      background: 'linear-gradient(90deg, #C9A84C 0%, #E8CC7A 100%)',
+                      borderRadius: 3,
+                      transition: 'width 600ms ease-out',
+                    }}
+                  />
+                </div>
 
-              {/* Value label */}
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'rgba(255,255,255,0.25)',
-                  marginTop: 6,
-                  textAlign: 'right',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {currentValue} / 100
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'rgba(255,255,255,0.25)',
+                    marginTop: 6,
+                    textAlign: 'right',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  총 {currentValue}%
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: 40 }}>
+            오른 스탯이 없습니다.
+          </div>
+        )}
       </div>
 
       {/* Done button */}

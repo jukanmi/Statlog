@@ -1,11 +1,10 @@
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats } from '@/types';
+import type { AIStats } from '@/types';
 
-type StatKey = keyof Stats;
+type StatKey = keyof AIStats;
 
-const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART'];
-// 6축, 60° 간격, 위쪽(top)에서 시작
-const ANGLES = [-90, -30, 30, 90, 150, 210];
+const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART', 'EXP'];
+const ANGLES = [-90, -38.57, 12.86, 64.29, 115.71, 167.14, 218.57]; // 360/7 ≈ 51.43° apart
 const CENTER = 130;
 const CHART_RADIUS = 80;
 const LABEL_RADIUS = 104;
@@ -41,17 +40,17 @@ const STAT_LABELS: Record<StatKey, string> = {
   COL: '협동력',
   PER: '끈기',
   ART: '예체능',
+  EXP: '실행경험',
 };
 
 const StatRadarChart: React.FC = () => {
   const { user } = useUserStore();
-  const { stats } = user;
+  const { aiStats } = user;
 
-  const safeStat = (key: StatKey) => stats[key] ?? 0;
-  const totalPts = STAT_KEYS.reduce((sum, key) => sum + safeStat(key), 0);
+  const totalPts = STAT_KEYS.reduce((sum, key) => sum + (aiStats[key] || 0), 0);
 
   const dataPoints = STAT_KEYS.map((key, i) =>
-    getPoint(ANGLES[i], (safeStat(key) / 100) * CHART_RADIUS)
+    getPoint(ANGLES[i], ((aiStats[key] || 0) / 100) * CHART_RADIUS)
   );
 
   const gridRings = [0.33, 0.66, 1.0];
@@ -61,12 +60,12 @@ const StatRadarChart: React.FC = () => {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8,
       }}>
-        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>나의 스탯</span>
+        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>AI 분석 스탯</span>
         <span style={{
           background: 'rgba(201,168,76,0.1)', color: '#C9A84C',
           borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600,
         }}>
-          {totalPts} pts
+          {totalPts}% total
         </span>
       </div>
 
@@ -108,12 +107,12 @@ const StatRadarChart: React.FC = () => {
             const dy = getLabelDy(ANGLES[i]);
             return (
               <text key={key} x={labelPt.x.toFixed(2)} y={labelPt.y.toFixed(2)}
-                fontSize={11} fill="rgba(255,255,255,0.5)">
+                fontSize={10} fill="rgba(255,255,255,0.5)">
                 <tspan x={labelPt.x.toFixed(2)} dy={dy} textAnchor={anchor}>{key}</tspan>
-                <tspan x={labelPt.x.toFixed(2)} dy={13} textAnchor={anchor}
-                  fill="rgba(255,255,255,0.8)">{safeStat(key)}</tspan>
                 <tspan x={labelPt.x.toFixed(2)} dy={12} textAnchor={anchor}
-                  fontSize={9} fill="rgba(255,255,255,0.3)">{STAT_LABELS[key]}</tspan>
+                  fill="rgba(255,255,255,0.8)">{aiStats[key] || 0}%</tspan>
+                <tspan x={labelPt.x.toFixed(2)} dy={11} textAnchor={anchor}
+                  fontSize={8} fill="rgba(255,255,255,0.3)">{STAT_LABELS[key]}</tspan>
               </text>
             );
           })}

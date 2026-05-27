@@ -12,9 +12,11 @@ interface UserState {
   ownedCharacterIds: string[];
   lastAttendanceDate: string | null;  // 'YYYY-MM-DD'
   updateStats: (stats: Partial<Stats>) => void;
+  updateAIStats: (stats: Partial<AIStats>) => void;
   updateProfileImage: (imageUrl: string | null) => void;
   addStats: (delta: Partial<Stats>) => void;
   addExp: (amount: number) => void;
+  addAIStats: (delta: Partial<AIStats>) => void;
   updateCurrency: (gold?: number, gems?: number) => void;
   updateNickname: (nickname: string) => void;
   addCharacter: (id: string) => void;
@@ -34,6 +36,7 @@ export const useUserStore = create<UserState>()(
         nickname: '탐험가',
         profileImage: null,
         stats: { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
+        aiStats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
         gold: 1200,
         gems: 30,
         level: 7,
@@ -44,6 +47,10 @@ export const useUserStore = create<UserState>()(
       updateStats: (stats) =>
         set((state) => ({
           user: { ...state.user, stats: { ...state.user.stats, ...stats } },
+        })),
+      updateAIStats: (stats) =>
+        set((state) => ({
+          user: { ...state.user, aiStats: { ...state.user.aiStats, ...stats } },
         })),
       addStats: (delta) =>
         set((state) => {
@@ -58,6 +65,24 @@ export const useUserStore = create<UserState>()(
         set((state) => ({
           user: { ...state.user, exp: state.user.exp + amount },
         })),
+      addAIStats: (delta) =>
+        set((state) => {
+          const cur = state.user.aiStats;
+          return {
+            user: {
+              ...state.user,
+              aiStats: {
+                HUM: cur.HUM + (delta.HUM ?? 0),
+                SOC: cur.SOC + (delta.SOC ?? 0),
+                NAT: cur.NAT + (delta.NAT ?? 0),
+                COL: cur.COL + (delta.COL ?? 0),
+                PER: cur.PER + (delta.PER ?? 0),
+                ART: cur.ART + (delta.ART ?? 0),
+                EXP: cur.EXP + (delta.EXP ?? 0),
+              },
+            },
+          };
+        }),
       updateCurrency: (gold, gems) =>
         set((state) => ({
           user: {
