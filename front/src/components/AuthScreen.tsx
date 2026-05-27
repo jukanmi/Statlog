@@ -5,15 +5,23 @@ interface AuthScreenProps {
 }
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
-  const handleKakaoLogin = () => {
-    localStorage.setItem('oauth_provider', 'kakao');
-    window.location.href = import.meta.env.VITE_API_URL + "/auth/kakao/url?redirect_uri=" + encodeURIComponent(window.location.origin + "/auth/callback");
+  const handleSocialLogin = async (provider: 'kakao' | 'google') => {
+    try {
+      localStorage.setItem('oauth_provider', provider);
+      const redirectUri = encodeURIComponent(window.location.origin + "/auth/callback");
+      const url = import.meta.env.VITE_API_URL + `/api/v1/auth/${provider}/url?redirect_uri=${redirectUri}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
+      const data = await res.json();
+      if (!data.auth_url) throw new Error('auth_url이 없습니다');
+      window.location.href = data.auth_url;
+    } catch (e) {
+      alert(`로그인 실패: ${(e as Error).message}`);
+    }
   };
 
-  const handleGoogleLogin = () => {
-    localStorage.setItem('oauth_provider', 'google');
-    window.location.href = import.meta.env.VITE_API_URL + "/auth/google/url?redirect_uri=" + encodeURIComponent(window.location.origin + "/auth/callback");
-  };
+  const handleKakaoLogin = () => handleSocialLogin('kakao');
+  const handleGoogleLogin = () => handleSocialLogin('google');
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">

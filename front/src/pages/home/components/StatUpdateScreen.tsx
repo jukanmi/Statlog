@@ -239,7 +239,8 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
 
       {/* Stat cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, overflowY: 'auto' }}>
-        {statGains.map(({ key, delta }) => {
+        {statGains.length > 0 ? (
+        statGains.map(({ key, delta }) => {
           // Use userStats if it's a standard stat, else userAIStats
           const currentValue = STAT_KEYS.includes(key as StatKey) 
             ? userStats[key as StatKey] 
