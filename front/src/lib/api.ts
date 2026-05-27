@@ -81,3 +81,23 @@ export async function generateQuiz(content: string): Promise<Quiz[]> {
     correctIndex: q.correct_index,
   }));
 }
+
+/**
+ * 내 프로필 정보 조회
+ * 백엔드: GET /api/v1/users/me
+ */
+export async function getUserProfile(token: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`프로필 조회 실패 (HTTP ${res.status})`);
+  }
+
+  return await res.json();
+}

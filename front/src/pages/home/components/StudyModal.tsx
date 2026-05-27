@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { StudySession } from '@/types';
+import { convertStudyToStats } from '@/lib/api';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import type { StudySession } from '@/types';
 
 interface StudyModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
   if (!mounted) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const session: StudySession = {
       id: crypto.randomUUID(),
       subject,
@@ -51,6 +52,21 @@ const StudyModal: React.FC<StudyModalProps> = ({
       date: new Date().toISOString().split('T')[0],
       statGained: {},
     };
+
+    try {
+      const statGained = await convertStudyToStats({
+        subject: session.subject,
+        content: session.content,
+        durationMinutes: session.durationMinutes,
+        date: session.date,
+      });
+      useUserStore.getState().addStats(statGained);
+      useUserStore.getState().addExp(statGained.EXP);
+      session.statGained = statGained; // Update session with actual stats
+    } catch (error) {
+      console.error('Failed to convert study to stats:', error);
+      // Optionally, handle error state or show a user notification
+    }
 
     if (useUserStore.getState().dataCollectionConsent) {
       fetch(import.meta.env.VITE_API_URL + '/analytics/study-session', {
@@ -87,6 +103,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
+          boxSizing: 'border-box',
           width: '100%',
           maxWidth: 430,
           backgroundColor: '#1A1A2E',
@@ -126,7 +143,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
         <div style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)' }} />
 
         {/* Subject select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
           <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
             무슨 공부를 했나요?
           </label>
@@ -134,7 +151,10 @@ const StudyModal: React.FC<StudyModalProps> = ({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             style={{
+              boxSizing: 'border-box',
               width: '100%',
+              minWidth: 0,
+              maxWidth: '100%',
               backgroundColor: '#0F0F1A',
               border: '1.5px solid #C9A84C',
               borderRadius: 10,
@@ -160,7 +180,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
         </div>
 
         {/* Content textarea */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
           <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
             학습 내용을 간단히 적어주세요
           </label>
@@ -172,7 +192,10 @@ const StudyModal: React.FC<StudyModalProps> = ({
             placeholder="오늘 배운 내용을 입력하세요..."
             rows={3}
             style={{
+              boxSizing: 'border-box',
               width: '100%',
+              minWidth: 0,
+              maxWidth: '100%',
               backgroundColor: '#0F0F1A',
               border: `1.5px solid ${textareaFocused ? '#C9A84C' : 'rgba(255,255,255,0.1)'}`,
               borderRadius: 10,
@@ -183,7 +206,6 @@ const StudyModal: React.FC<StudyModalProps> = ({
               resize: 'none',
               fontFamily: 'inherit',
               transition: 'border-color 200ms ease',
-              boxSizing: 'border-box',
             }}
           />
         </div>
