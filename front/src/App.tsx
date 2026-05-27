@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
 import AuthCallback from './pages/auth/AuthCallback';
 import BottomTabBar, { type Tab } from './components/BottomTabBar';
@@ -9,8 +9,10 @@ import PokedexPage from './pages/pokedex/PokedexPage';
 import PartyPage from './pages/party/PartyPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import AttendanceModal from './components/AttendanceModal';
+import ConsentModal from './components/ConsentModal';
 import { useUserStore } from './store/useUserStore';
 import { useStudyStore } from './store/useStudyStore';
+import { getUserProfile } from './lib/api';
 
 const tabLabels: Record<Tab, string> = {
   home: '홈',
@@ -21,12 +23,38 @@ const tabLabels: Record<Tab, string> = {
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [showAttendance, setShowAttendance] = useState(false);
   const lastAttendanceDate = useUserStore((s) => s.lastAttendanceDate);
   const checkDayReset = useStudyStore((s) => s.checkDayReset);
+  const navigate = useNavigate();
 
   useEffect(() => {
     checkDayReset();
+  }, []);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const userData = await getUserProfile(token);
+          // 백엔드에서 받아온 유저 정보로 스토어 업데이트
+          useUserStore.setState((state) => ({
+            user: { ...state.user, ...userData }
+          }));
+          handleLogin();
+        } catch (error) {
+          console.error('Failed to validate token:', error);
+          // 토큰이 만료되었거나 유효하지 않으면 로컬에서 제거
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+        }
+      }
+      setIsInitializing(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const handleLogin = () => {
@@ -35,6 +63,7 @@ const App: React.FC = () => {
     if (lastAttendanceDate !== today) {
       setShowAttendance(true);
     }
+    navigate('/home', { replace: true });
   };
 
   useEffect(() => {
@@ -42,6 +71,14 @@ const App: React.FC = () => {
     window.addEventListener('auth_success', handleAuthSuccess);
     return () => window.removeEventListener('auth_success', handleAuthSuccess);
   }, []);
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -74,6 +111,7 @@ const App: React.FC = () => {
       </div>
       <BottomTabBar />
       {showAttendance && <AttendanceModal onClose={() => setShowAttendance(false)} />}
+      <ConsentModal />
     </div>
   );
 };

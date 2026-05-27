@@ -1,51 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Stats } from '@/types';
-
-export interface Party {
-  id: string;
-  name: string;
-  description: string;
-  memberCount: number;
-  maxMembers: number;
-  weeklyMinutes: number;
-  tags: string[];
-  isJoined: boolean;
-}
-
-export interface Guild {
-  id: string;
-  name: string;
-  description: string;
-  memberCount: number;
-  maxMembers: number;
-  weeklyMinutes: number;
-  level: number;
-  isJoined: boolean;
-}
-
-export interface GuildMember {
-  id: string;
-  nickname: string;
-  weeklyMinutes: number;
-  totalMinutes: number;
-  grade: 'guild_master' | 'officer' | 'member';
-}
-
-const MOCK_PARTIES: Party[] = [
-  { id: 'p1', name: '새벽 4시 스터디', description: '매일 새벽 같이 공부해요', memberCount: 4, maxMembers: 6, weeklyMinutes: 1240, tags: ['수학', '과학'], isJoined: false },
-  { id: 'p2', name: '코딩 마스터즈', description: '개발 공부하는 사람들 모여요', memberCount: 6, maxMembers: 6, weeklyMinutes: 2100, tags: ['프로그래밍'], isJoined: false },
-  { id: 'p3', name: '영어 정복단', description: '토익 900 목표!', memberCount: 3, maxMembers: 5, weeklyMinutes: 890, tags: ['영어'], isJoined: false },
-  { id: 'p4', name: '수능 완전정복', description: '수능 준비 같이해요', memberCount: 5, maxMembers: 6, weeklyMinutes: 1680, tags: ['수학', '국어', '영어'], isJoined: false },
-  { id: 'p5', name: '취미 학습단', description: '무엇이든 배우는 모임', memberCount: 2, maxMembers: 8, weeklyMinutes: 430, tags: ['기타'], isJoined: false },
-];
-
-const MOCK_GUILDS: Guild[] = [
-  { id: 'g1', name: '공부의 신전', description: '최고를 향해 달려가는 길드', memberCount: 18, maxMembers: 30, weeklyMinutes: 12400, level: 8, isJoined: false },
-  { id: 'g2', name: '새벽별 학당', description: '꾸준함이 실력이다', memberCount: 12, maxMembers: 20, weeklyMinutes: 7200, level: 5, isJoined: false },
-  { id: 'g3', name: '지식탐험대', description: '모든 분야를 탐구합니다', memberCount: 25, maxMembers: 30, weeklyMinutes: 9800, level: 7, isJoined: false },
-  { id: 'g4', name: '입문자의 전당', description: '처음 시작하는 분 환영해요', memberCount: 8, maxMembers: 30, weeklyMinutes: 3100, level: 2, isJoined: false },
-];
+import { EVOLUTION_CHAIN, ALL_CHARACTERS } from '@/lib/gachaSystem';
+import { updateCharacterExpOnServer } from '@/lib/api';
 
 export interface AttendanceReward {
   gold: number;
@@ -55,155 +12,192 @@ export interface AttendanceReward {
 interface UserState {
   user: User;
   ownedCharacterIds: string[];
-  parties: Party[];
-  currentPartyId: string | null;
-  guilds: Guild[];
-  currentGuildId: string | null;
+  equippedCharacterId: string | null;              // 🎴 현재 장착 중인 대표 캐릭터 고유 ID
+  characterExpMap: Record<string, number>;         // 📊 캐릭터별 개별 EXP 누적 테이블 (Key: ID, Value: EXP)
   lastAttendanceDate: string | null;  // 'YYYY-MM-DD'
   updateStats: (stats: Partial<Stats>) => void;
+  updateAIStats: (stats: Partial<AIStats>) => void;
   updateProfileImage: (imageUrl: string | null) => void;
   addStats: (delta: Partial<Stats>) => void;
+  addExp: (amount: number) => void;
+  addAIStats: (delta: Partial<AIStats>) => void;
   updateCurrency: (gold?: number, gems?: number) => void;
   updateNickname: (nickname: string) => void;
   addCharacter: (id: string) => void;
-  joinParty: (id: string) => void;
-  leaveParty: () => void;
-  createParty: (p: Omit<Party, 'id' | 'isJoined'>) => void;
-  joinGuild: (id: string) => void;
-  leaveGuild: () => void;
-  createGuild: (g: Omit<Guild, 'id' | 'isJoined'>) => void;
   claimAttendance: () => AttendanceReward;
+  dataCollectionConsent: boolean | null;
+  setConsent: (consent: boolean) => void;
+  equipCharacter: (id: string) => void;            // 🎴 캐릭터 교체 함수
+  gainEquippedCharacterExp: (amount: number) => Promise<{ evolved: boolean; toast: string | null }>; // 🚀 경험치 축적 & 진화 엔진
 }
 
 export const useUserStore = create<UserState>()(
   persist(
-    (set) => ({
-  ownedCharacterIds: [],
-  parties: MOCK_PARTIES,
-  currentPartyId: null,
-  guilds: MOCK_GUILDS,
-  currentGuildId: null,
-  lastAttendanceDate: null,
-  user: {
-    id: 'user-001',
-    nickname: '탐험가',
-    profileImage: null,
-    stats: { INT: 50, STR: 0, END: 10, AGI: 0, CHA: 0 },
-    gold: 1200,
-    gems: 30,
-    level: 7,
-    exp: 340,
-  },
-  updateProfileImage: (imageUrl) =>
-    set((state) => ({ user: { ...state.user, profileImage: imageUrl } })),
-  updateStats: (stats) =>
-    set((state) => ({
-      user: { ...state.user, stats: { ...state.user.stats, ...stats } },
-    })),
-  addStats: (delta) =>
-    set((state) => {
-      const cur = state.user.stats;
-      return {
-        user: {
-          ...state.user,
-          stats: {
-            INT: cur.INT + (delta.INT ?? 0),
-            STR: cur.STR + (delta.STR ?? 0),
-            END: cur.END + (delta.END ?? 0),
-            AGI: cur.AGI + (delta.AGI ?? 0),
-            CHA: cur.CHA + (delta.CHA ?? 0),
+    (set, get) => ({
+      ownedCharacterIds: ['char_1', 'char_2', 'char_3'], // 초기 더미 진화용 기본 캐릭터 지급
+      equippedCharacterId: 'char_1',                    // 앱 구동 시 공부엉이 자동 장착
+      characterExpMap: {},
+      lastAttendanceDate: null,
+      dataCollectionConsent: null,
+      user: {
+        id: 'user-001',
+        nickname: '탐험가',
+        profileImage: null,
+        stats: { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
+        aiStats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
+        gold: 1200,
+        gems: 30,
+        level: 7,
+        exp: 340,
+      },
+      updateProfileImage: (imageUrl) =>
+        set((state) => ({ user: { ...state.user, profileImage: imageUrl } })),
+      updateStats: (stats) =>
+        set((state) => ({
+          user: { ...state.user, stats: { ...state.user.stats, ...stats } },
+        })),
+      updateAIStats: (stats) =>
+        set((state) => ({
+          user: { ...state.user, aiStats: { ...state.user.aiStats, ...stats } },
+        })),
+      addStats: (delta) =>
+        set((state) => {
+          const cur = state.user.stats;
+          const next = { ...cur };
+          (Object.keys(next) as (keyof Stats)[]).forEach((key) => {
+            next[key] = cur[key] + (delta[key] ?? 0);
+          });
+          return { user: { ...state.user, stats: next } };
+        }),
+      addExp: (amount) =>
+        set((state) => ({
+          user: { ...state.user, exp: state.user.exp + amount },
+        })),
+      addAIStats: (delta) =>
+        set((state) => {
+          const cur = state.user.aiStats;
+          return {
+            user: {
+              ...state.user,
+              aiStats: {
+                HUM: cur.HUM + (delta.HUM ?? 0),
+                SOC: cur.SOC + (delta.SOC ?? 0),
+                NAT: cur.NAT + (delta.NAT ?? 0),
+                COL: cur.COL + (delta.COL ?? 0),
+                PER: cur.PER + (delta.PER ?? 0),
+                ART: cur.ART + (delta.ART ?? 0),
+                EXP: cur.EXP + (delta.EXP ?? 0),
+              },
+            },
+          };
+        }),
+      updateCurrency: (gold, gems) =>
+        set((state) => ({
+          user: {
+            ...state.user,
+            gold: gold !== undefined ? gold : state.user.gold,
+            gems: gems !== undefined ? gems : state.user.gems,
           },
-        },
-      };
-    }),
-  updateCurrency: (gold, gems) =>
-    set((state) => ({
-      user: {
-        ...state.user,
-        gold: gold !== undefined ? gold : state.user.gold,
-        gems: gems !== undefined ? gems : state.user.gems,
+        })),
+      updateNickname: (nickname) =>
+        set((state) => ({ user: { ...state.user, nickname } })),
+      addCharacter: (id) =>
+        set((state) => ({
+          ownedCharacterIds: state.ownedCharacterIds.includes(id)
+            ? state.ownedCharacterIds
+            : [...state.ownedCharacterIds, id],
+        })),
+      claimAttendance: () => {
+        const reward: AttendanceReward = { gold: 100, gems: 1 };
+        const today = new Date().toLocaleDateString('en-CA');
+        set((state) => ({
+          lastAttendanceDate: today,
+          user: {
+            ...state.user,
+            gold: state.user.gold + reward.gold,
+            gems: state.user.gems + reward.gems,
+          },
+        }));
+        return reward;
       },
-    })),
-  updateNickname: (nickname) =>
-    set((state) => ({ user: { ...state.user, nickname } })),
-  addCharacter: (id) =>
-    set((state) => ({
-      ownedCharacterIds: state.ownedCharacterIds.includes(id)
-        ? state.ownedCharacterIds
-        : [...state.ownedCharacterIds, id],
-    })),
-  joinParty: (id) =>
-    set((state) => ({
-      currentPartyId: id,
-      parties: state.parties.map((p) =>
-        p.id === id ? { ...p, isJoined: true, memberCount: p.memberCount + 1 } : p
-      ),
-    })),
-  leaveParty: () =>
-    set((state) => ({
-      currentPartyId: null,
-      parties: state.parties.map((p) =>
-        p.id === state.currentPartyId
-          ? { ...p, isJoined: false, memberCount: Math.max(0, p.memberCount - 1) }
-          : p
-      ),
-    })),
-  createParty: (p) =>
-    set((state) => {
-      const newParty: Party = {
-        ...p,
-        id: `p${crypto.randomUUID()}`,
-        isJoined: true,
-        memberCount: 1,
-      };
-      return {
-        parties: [...state.parties, newParty],
-        currentPartyId: newParty.id,
-      };
-    }),
-  joinGuild: (id) =>
-    set((state) => ({
-      currentGuildId: id,
-      guilds: state.guilds.map((g) =>
-        g.id === id ? { ...g, isJoined: true, memberCount: g.memberCount + 1 } : g
-      ),
-    })),
-  leaveGuild: () =>
-    set((state) => ({
-      currentGuildId: null,
-      guilds: state.guilds.map((g) =>
-        g.id === state.currentGuildId
-          ? { ...g, isJoined: false, memberCount: Math.max(0, g.memberCount - 1) }
-          : g
-      ),
-    })),
-  createGuild: (g) =>
-    set((state) => {
-      const newGuild: Guild = {
-        ...g,
-        id: `g${Date.now()}`,
-        isJoined: true,
-        memberCount: 1,
-      };
-      return {
-        guilds: [...state.guilds, newGuild],
-        currentGuildId: newGuild.id,
-      };
-    }),
-  claimAttendance: () => {
-    const reward: AttendanceReward = { gold: 100, gems: 1 };
-    const today = new Date().toLocaleDateString('en-CA');
-    set((state) => ({
-      lastAttendanceDate: today,
-      user: {
-        ...state.user,
-        gold: state.user.gold + reward.gold,
-        gems: state.user.gems + reward.gems,
+      setConsent: (consent) => set({ dataCollectionConsent: consent }),
+      
+      // 캐릭터 장착 변경 액션 처리
+      equipCharacter: (id) => set({ equippedCharacterId: id }),
+
+      // 경험치 가산 및 실시간 진화 판독 처리 액션 코드
+      gainEquippedCharacterExp: async (amount) => {
+        const initialEquippedId = get().equippedCharacterId;
+        if (!initialEquippedId) return { evolved: false, toast: null };
+
+        // 📡 백엔드 연동용 API 비동기 정산 요청 호출
+        try {  
+          await updateCharacterExpOnServer({ characterId: initialEquippedId, expGained: amount });  
+        } catch (error) {  
+          console.error("Failed to sync character exp with server:", error);
+          // 필요 시 여기서 return 하여 로컬 정산을 차단할 수 있습니다.
+        }
+
+        // 비동기 작업 이후 최신 상태를 다시 조회 (Race Condition 방지)
+        const { characterExpMap, ownedCharacterIds, equippedCharacterId } = get();
+
+        const currentExp = (characterExpMap[initialEquippedId] || 0) + amount;
+        const nextEvolutionId = EVOLUTION_CHAIN[initialEquippedId];
+
+        // 🎯 경험치 커트라인 100점 돌파 및 진화체가 지정되어 있을 때
+        // (!ownedCharacterIds.includes 조건 제거 -> 가챠로 뽑았어도 진화 가능해야 함)
+        if (currentExp >= 100 && nextEvolutionId) {
+          const evolvedCharacter = ALL_CHARACTERS.find(c => c.id === nextEvolutionId);
+          
+          // 초과 경험치 계산 및 맵 업데이트
+          const leftoverExp = currentExp - 100;
+          const updatedExpMap = { 
+            ...characterExpMap, 
+            [initialEquippedId]: 0, 
+            [nextEvolutionId]: (characterExpMap[nextEvolutionId] || 0) + leftoverExp 
+          };
+          
+          // 소유 리스트 업데이트 (중복 방지 처리)
+          const updatedOwnedIds = Array.from(new Set([...ownedCharacterIds, nextEvolutionId]));
+
+          // 비동기 작업 동안 유저가 대표 캐릭터를 수동으로 바꾸지 않은 경우에만 자동 장착
+          const shouldUpdateEquipped = equippedCharacterId === initialEquippedId;
+
+          set({
+            characterExpMap: updatedExpMap,
+            ownedCharacterIds: updatedOwnedIds,
+            ...(shouldUpdateEquipped ? { equippedCharacterId: nextEvolutionId } : {})
+          });
+
+          return {
+            evolved: true,
+            toast: `🧬 [진화 성공] 캐릭터 경험치가 임계치를 돌파하여 대진화를 이뤄냈습니다! 새로운 진화 형태인 [${evolvedCharacter?.name}]을(를) 확인하세요!`
+          };
+        } else {
+          // 일반적인 경험치 단순 축적 스택
+          set({
+            characterExpMap: {
+              ...characterExpMap,
+              [initialEquippedId]: Math.min(100, currentExp)
+            }
+          });
+          return { evolved: false, toast: `✨ 착용 중인 캐릭터가 보상 EXP +${amount}를 획득했습니다. (${Math.min(100, currentExp)}/100)` };
+        }
       },
-    }));
-    return reward;
-  },
     }),
-    { name: 'user-store' }
+    {
+      name: 'user-store',
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as { user?: User } | undefined;
+        if (state?.user && version < 1) {
+          state.user = {
+            ...state.user,
+            stats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0 },
+          };
+        }
+        return state as UserState;
+      },
+    }
   )
 );

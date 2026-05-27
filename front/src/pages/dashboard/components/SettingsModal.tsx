@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { User, LogOut, Trash2, ChevronRight, Check } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { User, LogOut, Trash2, ChevronRight, Check, Target } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 
 interface SettingsModalProps {
@@ -10,9 +10,11 @@ interface SettingsModalProps {
 type ConfirmType = 'logout' | 'delete' | null;
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
-  const { user, updateNickname, updateProfileImage } = useUserStore();
+  const { user, updateNickname, updateProfileImage, dailyStudyGoalMinutes, updateDailyStudyGoal, dataCollectionConsent, setConsent } = useUserStore();
   const [editingNick, setEditingNick] = useState(false);
   const [nickValue, setNickValue] = useState(user.nickname);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalValue, setGoalValue] = useState(dailyStudyGoalMinutes.toString());
   const [confirmType, setConfirmType] = useState<ConfirmType>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -21,6 +23,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
     if (!trimmed) return;
     updateNickname(trimmed);
     setEditingNick(false);
+  };
+
+  const handleGoalConfirm = () => {
+    const val = parseInt(goalValue, 10);
+    if (!isNaN(val) && val > 0 && val <= 1440) {
+      updateDailyStudyGoal(val);
+    } else {
+      setGoalValue(dailyStudyGoalMinutes.toString());
+    }
+    setEditingGoal(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,6 +224,81 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
           ) : (
             <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
           )}
+        </SettingRow>
+
+        {/* ─── 목표 설정 ─── */}
+        <SectionHeader text="목표 설정" />
+
+        <SettingRow onClick={!editingGoal ? () => { setGoalValue(dailyStudyGoalMinutes.toString()); setEditingGoal(true); } : undefined}>
+          <Target size={20} color="rgba(255,255,255,0.5)" />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: 15 }}>일일 퀘스트 학습 목표 (분)</div>
+            {editingGoal ? (
+              <input
+                type="number"
+                min="1"
+                max="1440"
+                value={goalValue}
+                onChange={(e) => setGoalValue(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleGoalConfirm(); }}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 8,
+                  padding: '4px 10px',
+                  color: '#fff',
+                  fontSize: 13,
+                  outline: 'none',
+                  marginTop: 4,
+                  width: '80px',
+                }}
+              />
+            ) : (
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+                {dailyStudyGoalMinutes}분
+              </div>
+            )}
+          </div>
+          {editingGoal ? (
+            <button
+              onClick={handleGoalConfirm}
+              style={{
+                background: 'rgba(201,168,76,0.15)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '6px 10px',
+                cursor: 'pointer',
+                color: '#C9A84C',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Check size={16} />
+            </button>
+          ) : (
+            <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+          )}
+        </SettingRow>
+
+        {/* ─── 개인정보 ─── */}
+        <SectionHeader text="개인정보" />
+
+        <SettingRow>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: 15 }}>익명 데이터 수집 동의</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+              앱 개선을 위한 학습 통계(과목, 시간) 수집에 동의합니다.
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={dataCollectionConsent || false}
+              onChange={(e) => setConsent(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: '#C9A84C' }}
+            />
+          </label>
         </SettingRow>
 
         {/* ─── 계정 ─── */}

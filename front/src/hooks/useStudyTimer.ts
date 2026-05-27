@@ -31,6 +31,21 @@ export function useStudyTimer(pomodoro?: PomodoroConfig) {
     return () => clearInterval(id);
   }, [timerState]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && timerState === 'studying') {
+        pauseTimer();
+        alert('탭이 숨겨졌습니다. 타이머가 일시정지되었습니다.');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }, [timerState, pauseTimer]);
+
   const elapsedSeconds =
     timerState === 'studying' && startedAt !== null
       ? Math.floor((Date.now() - startedAt) / 1000)
