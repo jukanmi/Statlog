@@ -198,6 +198,9 @@ const HomePage: React.FC = () => {
     setScreen('quiz');
   };
 
+  const lastSessionQuiz = useStudyStore((s) => s.lastSessionQuiz);
+
+  // --- Non-timer screens ---
   if (screen === 'quiz') {
     return (
       <QuizScreen
@@ -212,7 +215,7 @@ const HomePage: React.FC = () => {
     return (
       <ResultScreen
         correctCount={quizCorrectCount}
-        totalCount={3}
+        totalCount={lastSessionQuiz?.length || 3}
         onContinue={handleResultContinue}
       />
     );

@@ -8,11 +8,29 @@ export interface Stats {
   ART: number; // 예체능 (Arts & Physical Education)
 }
 
+export interface AIStats {
+  HUM: number;
+  SOC: number;
+  NAT: number;
+  COL: number;
+  PER: number;
+  ART: number;
+  EXP: number;
+}
+
+export interface AIQuizItem {
+  question: string;
+  choices: string[];
+  answer: string;
+  explanation: string;
+}
+
 export interface User {
   id: string;
   nickname: string;
   profileImage: string | null;
   stats: Stats;
+  aiStats: AIStats;
   gold: number;
   gems: number;
   level: number;
@@ -27,6 +45,7 @@ export interface StudySession {
   date: string;
   statGained: Partial<Stats>;
   expGained?: number;
+  aiStatGained?: Partial<AIStats>;
 }
 
 export interface Character {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { StudySession } from '@/types';
+import type { StudySession, AIStats, AIQuizItem } from '@/types';
 
 
 type TimerState = 'idle' | 'studying' | 'paused';
@@ -23,6 +23,10 @@ interface StudyState {
   currentContent: string;
   studyStreak: number;
   streakBonusPending: boolean;
+  // AI results from the last finished session
+  lastSessionStats: AIStats | null;
+  lastSessionQuiz: AIQuizItem[] | null;
+  // Timer state (persists across tab switches)
   timerState: TimerState;
   startedAt: number | null;
   accumulatedSeconds: number;
@@ -34,6 +38,8 @@ interface StudyState {
   resetTimer: () => void;
   checkDayReset: () => void;
   clearStreakBonus: () => void;
+  setLastSessionStats: (stats: AIStats | null) => void;
+  setLastSessionQuiz: (quiz: AIQuizItem[] | null) => void;
 }
 
 export const useStudyStore = create<StudyState>()(
@@ -48,6 +54,8 @@ export const useStudyStore = create<StudyState>()(
       currentContent: '',
       studyStreak: 0,
       streakBonusPending: false,
+      lastSessionStats: null,
+      lastSessionQuiz: null,
       timerState: 'idle',
       startedAt: null,
       accumulatedSeconds: 0,
@@ -88,7 +96,7 @@ export const useStudyStore = create<StudyState>()(
           };
         }),
       clearSessions: () =>
-        set({ sessions: [], todayMinutes: 0, currentSubject: '', currentContent: '' }),
+        set({ sessions: [], todayMinutes: 0, currentSubject: '', currentContent: '', lastSessionStats: null, lastSessionQuiz: null }),
       startTimer: () =>
         set((state) => ({
           timerState: 'studying',
@@ -121,6 +129,8 @@ export const useStudyStore = create<StudyState>()(
           return {};
         }),
       clearStreakBonus: () => set({ streakBonusPending: false }),
+      setLastSessionStats: (stats) => set({ lastSessionStats: stats }),
+      setLastSessionQuiz: (quiz) => set({ lastSessionQuiz: quiz }),
     }),
     {
       name: 'study-store',
@@ -144,6 +154,8 @@ export const useStudyStore = create<StudyState>()(
         currentSubject: state.currentSubject,
         currentContent: state.currentContent,
         studyStreak: state.studyStreak,
+        lastSessionStats: state.lastSessionStats,
+        lastSessionQuiz: state.lastSessionQuiz,
         accumulatedSeconds: state.timerState === 'studying' && state.startedAt
           ? Math.floor((Date.now() - state.startedAt) / 1000)
           : state.accumulatedSeconds,

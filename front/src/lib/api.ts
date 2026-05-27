@@ -23,28 +23,35 @@ interface StudySessionResponse {
 
 /**
  * 학습 세션을 백엔드에 보내 AI가 분석한 stat_gained(6대 능력치 + EXP)를 반환받는다.
- * 백엔드: POST /api/v1/study/sessions → AI_routers.analyze_log_to_stats
+ * 백엔드 미구현 시 0으로 채워진 기본값을 반환한다.
  */
 export async function convertStudyToStats(
   payload: StudySessionPayload
 ): Promise<StatConversionResult> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/study/sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      subject: payload.subject,
-      content: payload.content,
-      duration_minutes: payload.durationMinutes,
-      date: payload.date,
-    }),
-  });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/study/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject: payload.subject,
+        content: payload.content,
+        duration_minutes: payload.durationMinutes,
+        date: payload.date,
+      }),
+    });
 
-  if (!res.ok) {
-    throw new Error(`스탯 변환 요청 실패 (HTTP ${res.status})`);
+    if (!res.ok) {
+      throw new Error(`스탯 변환 요청 실패 (HTTP ${res.status})`);
+    }
+
+    const data: StudySessionResponse = await res.json();
+    return data.stat_gained;
+  } catch (error) {
+    console.warn('Backend study sessions API failed, using empty gains:', error);
+    return {
+      HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0
+    };
   }
-
-  const data: StudySessionResponse = await res.json();
-  return data.stat_gained;
 }
 
 // --- AI 퀴즈 생성 ---
@@ -79,6 +86,56 @@ export async function generateQuiz(content: string): Promise<Quiz[]> {
     options: q.options,
     correctIndex: q.correct_index,
   }));
+}
+
+/**
+ * 내 프로필 정보 조회
+ * 백엔드: GET /api/v1/users/me
+ * 백엔드 미구현 시 Mock 데이터를 반환한다.
+ */
+export async function getUserProfile(token: string) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`프로필 조회 실패 (HTTP ${res.status})`);
+    }
+
+    const data = await res.json();
+    
+    // 백엔드 데이터에 필수 필드(stats 등)가 없을 경우 Mock과 합성
+    return {
+      id: data.id || 'user-001',
+      nickname: data.nickname || '탐험가',
+      profileImage: data.profile_image || null,
+      stats: data.stats || { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
+      aiStats: data.aiStats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
+      gold: data.gold ?? 1200,
+      gems: data.gems ?? 30,
+      level: data.level ?? 7,
+      exp: data.exp ?? 340,
+    };
+  } catch (error) {
+    console.warn('Backend profile API failed, using mock data:', error);
+    // 백엔드가 아예 안 켜져 있거나 401/404일 때 반환할 완전한 Mock 데이터
+    return {
+      id: 'user-001',
+      nickname: '탐험가(Mock)',
+      profileImage: null,
+      stats: { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
+      aiStats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
+      gold: 1200,
+      gems: 30,
+      level: 7,
+      exp: 340,
+    };
+  }
 }
 
 // ================= 🧬 캐릭터 경험치 및 진화 정산 인터페이스 파트 =================
