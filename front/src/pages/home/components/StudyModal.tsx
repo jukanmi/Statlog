@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
+import { generateStats, generateQuiz } from '@/lib/aiApi';
 import type { StudySession } from '@/types';
+import { Loader2 } from 'lucide-react';
 
 interface StudyModalProps {
   isOpen: boolean;
@@ -25,7 +27,11 @@ const StudyModal: React.FC<StudyModalProps> = ({
   const [subject, setSubject] = useState<string>('수학');
   const [content, setContent] = useState('');
   const [textareaFocused, setTextareaFocused] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const addSession = useStudyStore((s) => s.addSession);
+  const setLastSessionStats = useStudyStore((s) => s.setLastSessionStats);
+  const setLastSessionQuiz = useStudyStore((s) => s.setLastSessionQuiz);
 
   // Mount → next tick → slide up
   useEffect(() => {
@@ -42,14 +48,40 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
   if (!mounted) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!content.trim()) {
+      alert('학습 내용을 입력해주세요!');
+      return;
+    }
+
+    setIsGenerating(true);
+    let aiStats: AIStats | undefined;
+    let aiQuiz: AIQuizItem[] | undefined;
+
+    try {
+      // 1. Generate Stats and Quiz in parallel
+      [aiStats, aiQuiz] = await Promise.all([
+        generateStats(content),
+        generateQuiz(content)
+      ]);
+    } catch (error) {
+      console.error('AI Generation failed or timed out:', error);
+      // Graceful fallback: we will proceed without AI data, 
+      // which will cause QuizScreen to use fallback quizzes and StatUpdateScreen to show 0 gains.
+      alert('AI 처리에 실패하여 기본 퀴즈로 대체합니다.');
+    } finally {
+      setIsGenerating(false);
+    }
+
+    // 2. Save session regardless of AI success
     const session: StudySession = {
       id: crypto.randomUUID(),
       subject,
       content,
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
       date: new Date().toISOString().split('T')[0],
-      statGained: {},
+      statGained: {}, // legacy stats
+      aiStatGained: aiStats, // might be undefined if failed
     };
 
     if (useUserStore.getState().dataCollectionConsent) {
@@ -64,7 +96,11 @@ const StudyModal: React.FC<StudyModalProps> = ({
       }).catch(err => console.error('Failed to send anonymous analytics:', err));
     }
 
+    // 3. Update store with AI results (or null to clear previous)
+    setLastSessionStats(aiStats || null);
+    setLastSessionQuiz(aiQuiz || null);
     addSession(session);
+
     setContent('');
     setSubject('수학');
     onSave();
@@ -72,7 +108,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
   return (
     <div
-      onClick={onClose}
+      onClick={isGenerating ? undefined : onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -133,6 +169,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
           <select
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            disabled={isGenerating}
             style={{
               width: '100%',
               backgroundColor: '#0F0F1A',
@@ -149,6 +186,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'right 14px center',
               paddingRight: 40,
+              opacity: isGenerating ? 0.6 : 1,
             }}
           >
             {SUBJECTS.map((s) => (
@@ -169,6 +207,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
             onChange={(e) => setContent(e.target.value)}
             onFocus={() => setTextareaFocused(true)}
             onBlur={() => setTextareaFocused(false)}
+            disabled={isGenerating}
             placeholder="오늘 배운 내용을 입력하세요..."
             rows={3}
             style={{
@@ -184,6 +223,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
               fontFamily: 'inherit',
               transition: 'border-color 200ms ease',
               boxSizing: 'border-box',
+              opacity: isGenerating ? 0.6 : 1,
             }}
           />
         </div>
@@ -191,6 +231,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
         {/* Save button */}
         <button
           onClick={handleSave}
+          disabled={isGenerating}
           style={{
             width: '100%',
             height: 52,
@@ -200,20 +241,33 @@ const StudyModal: React.FC<StudyModalProps> = ({
             color: '#0F0F1A',
             fontSize: 16,
             fontWeight: 700,
-            cursor: 'pointer',
+            cursor: isGenerating ? 'not-allowed' : 'pointer',
             marginTop: 4,
             transition: 'opacity 150ms ease, transform 150ms ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
           }}
           onMouseDown={(e) => {
+            if (isGenerating) return;
             (e.currentTarget as HTMLButtonElement).style.opacity = '0.85';
             (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)';
           }}
           onMouseUp={(e) => {
+            if (isGenerating) return;
             (e.currentTarget as HTMLButtonElement).style.opacity = '1';
             (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
           }}
         >
-          기록 저장하기
+          {isGenerating ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              AI 분석 중...
+            </>
+          ) : (
+            '기록 저장하기'
+          )}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ export type Quiz = {
   question: string;
   options: string[];
   correctIndex: number;
+  explanation?: string;
 };
 
 const QUIZ_DB: Record<string, Quiz[]> = {

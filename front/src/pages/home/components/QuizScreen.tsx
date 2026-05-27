@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { getQuizBySubject, type Quiz } from '@/lib/generateQuiz';
+import { useStudyStore } from '@/store/useStudyStore';
 
 interface QuizScreenProps {
   subject: string;
@@ -9,14 +10,30 @@ interface QuizScreenProps {
 }
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
-const TOTAL = 3;
 
 const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) => {
-  const [quizzes] = useState<Quiz[]>(() => getQuizBySubject(subject));
+  const lastSessionQuiz = useStudyStore((s) => s.lastSessionQuiz);
+  
+  const quizzes = useMemo<Quiz[]>(() => {
+    if (lastSessionQuiz && lastSessionQuiz.length > 0) {
+      return lastSessionQuiz.map(item => ({
+        question: item.question,
+        options: item.choices,
+        correctIndex: OPTION_LABELS.indexOf(item.answer as any) !== -1 
+          ? OPTION_LABELS.indexOf(item.answer as any) 
+          : 0,
+        explanation: item.explanation
+      }));
+    }
+    return getQuizBySubject(subject);
+  }, [lastSessionQuiz, subject]);
+
+  const totalQuestions = quizzes.length;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [advancing, setAdvancing] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const correctAtSelect = useRef(0);
 
   const quiz = quizzes[currentIndex];
@@ -35,29 +52,18 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
     const isCorrect = optionIndex === quiz.correctIndex;
     const newCount = correctAtSelect.current + (isCorrect ? 1 : 0);
     if (isCorrect) setCorrectCount(newCount);
-    setAdvancing(true);
-
-    timeoutRef.current = setTimeout(() => {
-      if (currentIndex < TOTAL - 1) {
-        correctAtSelect.current = newCount;
-        setCurrentIndex((p) => p + 1);
-        setSelectedIndex(null);
-        setAdvancing(false);
-      } else {
-        onComplete(newCount);
-      }
-    }, 800);
+    
+    // Show explanation after selection
+    setShowExplanation(true);
   };
 
   const handleNext = () => {
     if (selectedIndex === null) return;
     
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+    setAdvancing(true);
+    setShowExplanation(false);
 
-    if (currentIndex < TOTAL - 1) {
+    if (currentIndex < totalQuestions - 1) {
       correctAtSelect.current = correctCount;
       setCurrentIndex((p) => p + 1);
       setSelectedIndex(null);
@@ -119,7 +125,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
         paddingBottom: 'calc(40px + env(safe-area-inset-bottom))',
         maxWidth: 430,
         margin: '0 auto',
-        overflow: 'hidden',
+        overflowY: 'auto',
       }}
     >
       {/* Top bar */}
@@ -152,7 +158,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
 
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {Array.from({ length: TOTAL }).map((_, i) => (
+          {Array.from({ length: totalQuestions }).map((_, i) => (
             <div
               key={i}
               style={{
@@ -172,7 +178,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
 
         {/* Counter */}
         <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
-          {currentIndex + 1} / {TOTAL}
+          {currentIndex + 1} / {totalQuestions}
         </span>
       </div>
 
@@ -218,7 +224,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
       </div>
 
       {/* Answer options */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
         {quiz.options.map((option, i) => (
           <button
             key={i}
@@ -261,10 +267,29 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
         ))}
       </div>
 
+      {/* Explanation */}
+      {showExplanation && (quiz as any).explanation && (
+        <div
+          style={{
+            backgroundColor: 'rgba(201,168,76,0.05)',
+            border: '1px solid rgba(201,168,76,0.15)',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 20,
+            animation: 'fadeIn 300ms ease-out',
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#C9A84C', marginBottom: 6 }}>해설</div>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5 }}>
+            {(quiz as any).explanation}
+          </p>
+        </div>
+      )}
+
       {/* Next button — appears after selection */}
       <div
         style={{
-          marginTop: 20,
+          marginTop: 'auto',
           opacity: selectedIndex !== null ? 1 : 0,
           transform: selectedIndex !== null ? 'translateY(0)' : 'translateY(8px)',
           transition: 'opacity 200ms ease, transform 200ms ease',
@@ -285,9 +310,16 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, onComplete, onSkip }) 
             cursor: 'pointer',
           }}
         >
-          {currentIndex < TOTAL - 1 ? '다음' : '결과 보기'}
+          {currentIndex < totalQuestions - 1 ? '다음' : '결과 보기'}
         </button>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

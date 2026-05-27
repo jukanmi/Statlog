@@ -1,10 +1,10 @@
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats } from '@/types';
+import type { AIStats } from '@/types';
 
-type StatKey = keyof Stats;
+type StatKey = keyof AIStats;
 
-const STAT_KEYS: StatKey[] = ['INT', 'STR', 'END', 'AGI', 'CHA'];
-const ANGLES = [-90, -18, 54, 126, 198]; // degrees, starting from top, 72° apart
+const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART', 'EXP'];
+const ANGLES = [-90, -38.57, 12.86, 64.29, 115.71, 167.14, 218.57]; // 360/7 ≈ 51.43° apart
 const CENTER = 120;
 const CHART_RADIUS = 80;
 const LABEL_RADIUS = 100;
@@ -35,12 +35,12 @@ const getLabelDy = (angle: number): number => {
 
 const StatRadarChart: React.FC = () => {
   const { user } = useUserStore();
-  const { stats } = user;
+  const { aiStats } = user;
 
-  const totalPts = STAT_KEYS.reduce((sum, key) => sum + stats[key], 0);
+  const totalPts = STAT_KEYS.reduce((sum, key) => sum + (aiStats[key] || 0), 0);
 
   const dataPoints = STAT_KEYS.map((key, i) =>
-    getPoint(ANGLES[i], (stats[key] / 100) * CHART_RADIUS)
+    getPoint(ANGLES[i], ((aiStats[key] || 0) / 100) * CHART_RADIUS)
   );
 
   const gridRings = [0.33, 0.66, 1.0];
@@ -54,7 +54,7 @@ const StatRadarChart: React.FC = () => {
         justifyContent: 'space-between',
         marginBottom: 8,
       }}>
-        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>나의 스탯</span>
+        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>AI 분석 스탯</span>
         <span style={{
           background: 'rgba(201,168,76,0.1)',
           color: '#C9A84C',
@@ -63,7 +63,7 @@ const StatRadarChart: React.FC = () => {
           fontSize: 12,
           fontWeight: 600,
         }}>
-          {totalPts} pts
+          {totalPts}% total
         </span>
       </div>
 
@@ -133,7 +133,7 @@ const StatRadarChart: React.FC = () => {
                 key={key}
                 x={labelPt.x.toFixed(2)}
                 y={labelPt.y.toFixed(2)}
-                fontSize={11}
+                fontSize={10}
                 fill="rgba(255,255,255,0.5)"
               >
                 <tspan
@@ -145,11 +145,11 @@ const StatRadarChart: React.FC = () => {
                 </tspan>
                 <tspan
                   x={labelPt.x.toFixed(2)}
-                  dy={13}
+                  dy={12}
                   textAnchor={anchor}
                   fill="rgba(255,255,255,0.8)"
                 >
-                  {stats[key]}
+                  {aiStats[key] || 0}%
                 </tspan>
               </text>
             );
