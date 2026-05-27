@@ -1,22 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import OAuth2PasswordBearer
 
 from core.security import decode_access_token
 from schemas.user import serialize_user
+from models.user import User
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
-bearer_scheme = HTTPBearer()
 
+# Swagger UI의 Authorize 버튼에서 토큰을 편하게 입력할 수 있도록 OAuth2PasswordBearer 사용
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/dev-login", auto_error=False)
+
+
+# TODO: 실제 DB를 연동하여 유저 정보를 조회하는 로직으로 교체해야 합니다.
+async def get_user_by_id(user_id: str):
+    # Mock 유저 객체 반환 (임시)
+    user = User(id=user_id, nickname="테스트유저")
+    return user
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    token: str = Depends(oauth2_scheme),
 ):
     """
     Authorization: Bearer <access_token>에서 현재 유저를 가져오는 함수
     """
 
-    token = credentials.credentials
+    if not token:
+        raise HTTPException(status_code=401, detail="인증 토큰이 없습니다")
 
     try:
         payload = decode_access_token(token)

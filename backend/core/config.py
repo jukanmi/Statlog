@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     BACKEND_BASE_URL: str = "http://localhost:8000"
     FRONTEND_BASE_URL: str = "http://localhost:5173"
 
+    # Database 설정
+    DATABASE_URL: str = "sqlite:///./statlog.db"
+
     # JWT 설정
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"

@@ -1,5 +1,9 @@
-import os
 import sys
+import os
+
+# backend 폴더 내부의 모듈(api, core, models 등)을 루트에서도 찾을 수 있도록 경로 추가
+sys.path.append(os.path.join(os.path.dirname(__file__), "backend"))
+
 from contextlib import asynccontextmanager
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
@@ -11,6 +15,7 @@ from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_r
 from fastapi.middleware.cors import CORSMiddleware
 from api import auth, users, analytics
 from services.oauth import close_http_client
+from api import parties, avatars
 
 
 @asynccontextmanager
@@ -38,8 +43,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
-app.include_router(analytics.router, prefix="/api/v1")
-app.include_router(ai_router, prefix="/api/v1")
+app.include_router(parties.router, prefix="/api/v1")
+app.include_router(avatars.router, prefix="/api/v1")
 
 
 @app.get("/health")

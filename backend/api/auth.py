@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import httpx
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.config import settings
@@ -23,7 +24,37 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
+# TODO: DB 연동 후 실제 DB 기반 유저 생성 및 리프레시 토큰 저장 로직으로 교체해야 합니다.
+async def get_or_create_user_from_oauth(oauth_user: dict):
+    raise HTTPException(status_code=501, detail="유저 생성 및 조회 로직이 아직 구현되지 않았습니다.")
+
+async def save_refresh_token(user_id: str, token_hash: str, expires_at: datetime):
+    pass  # 위 함수에서 501 에러가 발생하므로 여기서는 일단 pass 처리합니다.
+
 Provider = Literal["kakao", "google"]
+
+
+class DevLoginRequest(BaseModel):
+    user_id: str
+    nickname: str
+
+
+@router.post("/dev-login")
+async def dev_login(body: DevLoginRequest):
+    """
+    개발용 로그인 API
+    
+    로컬 개발 및 Swagger 테스트를 위해 토큰을 강제로 발급합니다.
+    """
+    # TODO: DB 연동 후 실제 DB에 유저가 없으면 생성, 있으면 조회하는 로직으로 교체해야 합니다.
+    # 예: user, created = await get_or_create_user(body.user_id, body.nickname)
+    
+    access_token = create_access_token(user_id=body.user_id)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 @router.get("/{provider}/url", response_model=OAuthUrlResponse)
