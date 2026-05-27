@@ -1,5 +1,5 @@
 import logging
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import httpx
 from fastapi import HTTPException
@@ -15,6 +15,7 @@ ANALYSIS_INSTRUCTION = PROMPTS["analysis_instruction"]
 RETRY_INSTRUCTION = PROMPTS["retry_instruction"]
 QUIZ_INSTRUCTION = PROMPTS["quiz_instruction"]
 QUIZ_RETRY_INSTRUCTION = PROMPTS["quiz_retry_instruction"]
+QUIZ_PARTIAL_RETRY_INSTRUCTION = PROMPTS["quiz_partial_retry_instruction"]
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -31,10 +32,15 @@ class StatResponse(BaseModel):
     EXP: int = 0  # 경험치 (Experience Points)
 
 
+# 학습 깊이 — LLM이 분류하는 세 단계 (암기/이해/응용)
+LearningDepth = Literal["memorize", "understand", "apply"]
+
+
 class LLMStatPayload(BaseModel):
     """LLM 스탯 응답 검증용 고정 스키마.
 
-    각 필드는 능력치의 '백분율 분배'(0~100 정수, 합계 100)를 의미한다.
+    HUM~ART 필드는 능력치의 '백분율 분배'(0~100 정수, 합계 100)를 의미한다.
+    depth는 학습 '깊이'를 한 단어로 분류한 값으로, EXP 가중치 계산에 쓰인다.
     실제 스탯량은 ai_log에서 학습 시간 기반 총량(budget)을 이 백분율로 나눠 산정한다.
     """
 
@@ -46,16 +52,22 @@ class LLMStatPayload(BaseModel):
     COL: int
     PER: int
     ART: int
+    depth: LearningDepth = "understand"
 
 
 class QuizItemPayload(BaseModel):
-    """LLM 퀴즈 응답의 개별 문항 검증용 스키마."""
+    """LLM 퀴즈 응답의 개별 문항 검증용 스키마.
+
+    depth는 문항의 학습 깊이 분류로, 부분 재요청 시 누락 분류를 식별하는 키.
+    LLM이 깊이를 빠뜨려도 응답 순서로 보정한다 (router 측에서 처리).
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     question: str
     options: list[str]
     correct_index: int
+    depth: LearningDepth | None = None
 
     @model_validator(mode="after")
     def _check_correct_index(self) -> "QuizItemPayload":
@@ -74,28 +86,66 @@ class QuizPayload(BaseModel):
     quizzes: list[QuizItemPayload] = Field(min_length=1)
 
 
-# 퀴즈는 이 개수를 목표로 누적한다 (prompts.yaml의 "정확히 3개"와 일치).
-QUIZ_TARGET_COUNT = 3
+# 퀴즈는 이 3가지 깊이를 이 순서로 출제·수집한다.
+# prompts.yaml의 "1번 암기 → 2번 이해 → 3번 응용"과 일치해야 한다.
+QUIZ_DEPTH_ORDER: tuple[LearningDepth, ...] = ("memorize", "understand", "apply")
+QUIZ_TARGET_COUNT = len(QUIZ_DEPTH_ORDER)
+
+# 부분 재요청 시 LLM에 보여줄 한국어 분류 라벨.
+_DEPTH_KO: dict[LearningDepth, str] = {
+    "memorize": "암기",
+    "understand": "이해",
+    "apply": "응용",
+}
 
 
-def _validate_quiz_items(raw: object) -> tuple[list[QuizItemPayload], int]:
-    """퀴즈 응답을 '문항 단위'로 검증한다.
+def _format_missing_labels(missing: tuple[LearningDepth, ...]) -> str:
+    """누락 분류 튜플 → "1번 이해, 2번 응용" 같은 한국어 라벨 문자열."""
+    return ", ".join(
+        f"{i + 1}번 {_DEPTH_KO[d]}({d})" for i, d in enumerate(missing)
+    )
 
-    전체를 한 번에 검증(all-or-nothing)하지 않고 문항별로 검증하여,
-    잘못된 문항은 버리고 유효한 문항만 추려낸다.
-    반환: (유효 문항 리스트, 무효 문항 수).
+
+def _route_quiz_items(
+    raw: object,
+    expected: tuple[LearningDepth, ...],
+) -> tuple[dict[LearningDepth, QuizItemPayload], int]:
+    """LLM 응답을 깊이별 슬롯에 배치한다.
+
+    - 각 문항의 'depth' 필드를 우선 사용해 슬롯에 매핑한다.
+    - depth가 비어 있거나 인식 불가하면 응답 순서를 expected에 매칭한다
+      (예: expected=("understand","apply")일 때 첫 번째 무라벨 문항은 understand로).
+    - 같은 깊이가 여러 번 오면 첫 유효 문항만 채택한다.
+    반환: (깊이→문항 매핑, 무효 문항 수).
     """
     items = raw.get("quizzes", []) if isinstance(raw, dict) else []
     if not isinstance(items, list):
-        return [], 0
-    valid: list[QuizItemPayload] = []
+        return {}, 0
+
+    slots: dict[LearningDepth, QuizItemPayload] = {}
     invalid = 0
+    fallback_pos = 0
     for item in items:
         try:
-            valid.append(QuizItemPayload.model_validate(item))
+            validated = QuizItemPayload.model_validate(item)
         except ValidationError:
             invalid += 1
-    return valid, invalid
+            fallback_pos += 1
+            continue
+
+        depth = validated.depth
+        if depth not in QUIZ_DEPTH_ORDER:
+            depth = (
+                expected[fallback_pos]
+                if fallback_pos < len(expected)
+                else None
+            )
+        fallback_pos += 1
+
+        if depth and depth not in slots:
+            validated.depth = depth  # 빈 라벨 보정
+            slots[depth] = validated
+    return slots, invalid
 
 
 class AIService:
@@ -176,18 +226,28 @@ class AIService:
     async def request_quiz_generation(log_text: str) -> QuizPayload:
         """자연어 학습 내용 → 4지선다 복습 퀴즈 생성 (GCP LLM).
 
-        문항 단위로 검증하여 잘못된 문항은 버리고 유효한 문항만 누적한다.
-        목표 개수(QUIZ_TARGET_COUNT)에 못 미치면 재요청하여 채우며,
-        settings.MAX_RETRIES회 안에 못 채우면 콘솔에 에러를 남기고 실패한다.
+        깊이별 슬롯(암기/이해/응용)을 추적하여, 누락되거나 스키마를 위반한
+        '그 분류의 문항만' 다시 요청한다. 단순히 부족 개수를 채우지 않는다.
+        settings.MAX_RETRIES회 안에 3슬롯을 모두 채우지 못하면 502.
         """
-        collected: list[QuizItemPayload] = []
-        seen_questions: set[str] = set()
-        instruction = QUIZ_INSTRUCTION
+        slots: dict[LearningDepth, QuizItemPayload] = {}
+        missing: tuple[LearningDepth, ...] = QUIZ_DEPTH_ORDER
         last_error: Exception | None = None
         last_body: str | None = None
 
         async with httpx.AsyncClient() as client:
             for attempt in range(settings.MAX_RETRIES):
+                # 첫 시도는 전체 출제, 이후엔 누락 분류만 부분 재요청
+                if attempt == 0 or len(missing) == len(QUIZ_DEPTH_ORDER):
+                    instruction = (
+                        QUIZ_INSTRUCTION if attempt == 0 else QUIZ_RETRY_INSTRUCTION
+                    )
+                else:
+                    # 스키마 안의 중괄호와 충돌하지 않도록 replace로 치환
+                    instruction = QUIZ_PARTIAL_RETRY_INSTRUCTION.replace(
+                        "<<MISSING>>", _format_missing_labels(missing),
+                    )
+
                 try:
                     response = await client.post(
                         settings.GCP_QUIZ_ENDPOINT,
@@ -205,33 +265,34 @@ class AIService:
                     )
                     continue
 
-                # 문항 단위 검증 — 유효 문항만 누적 (질문 중복 제거)
-                valid, invalid = _validate_quiz_items(response.json())
-                for item in valid:
-                    key = item.question.strip()
-                    if key and key not in seen_questions:
-                        seen_questions.add(key)
-                        collected.append(item)
+                # 응답을 누락 분류 슬롯에 배치 — depth 라벨 우선, 없으면 missing 순서로 보정
+                new_slots, invalid = _route_quiz_items(response.json(), missing)
+                for depth, item in new_slots.items():
+                    if depth not in slots:
+                        slots[depth] = item
 
-                if len(collected) >= QUIZ_TARGET_COUNT:
-                    return QuizPayload(quizzes=collected[:QUIZ_TARGET_COUNT])
+                missing = tuple(d for d in QUIZ_DEPTH_ORDER if d not in slots)
+                if not missing:
+                    return QuizPayload(quizzes=[slots[d] for d in QUIZ_DEPTH_ORDER])
 
-                # 부족 — 잘못된 문항은 버리고 부족분을 재요청
                 last_error = ValueError(
-                    f"유효 문항 누적 {len(collected)}/{QUIZ_TARGET_COUNT}개"
+                    f"누락 분류 {[_DEPTH_KO[d] for d in missing]}"
                 )
                 logger.warning(
-                    "GCP 퀴즈 문항 부족 (%d/%d): 누적 유효 %d / 목표 %d (이번 응답 무효 %d개) — 재요청",
+                    "GCP 퀴즈 분류 누락 (%d/%d): 채워진 %s / 누락 %s (이번 응답 무효 %d개) — 누락 분류만 재요청",
                     attempt + 1, settings.MAX_RETRIES,
-                    len(collected), QUIZ_TARGET_COUNT, invalid,
+                    [_DEPTH_KO[d] for d in slots],
+                    [_DEPTH_KO[d] for d in missing],
+                    invalid,
                 )
-                instruction = QUIZ_RETRY_INSTRUCTION
 
-        # 목표 개수를 못 채움 — 콘솔에 상세 에러 출력
+        # 누락 분류를 끝까지 못 채움 — 콘솔에 상세 에러 출력
         logger.error(
-            "GCP 퀴즈 생성이 %d회 만에 목표(%d개)를 못 채웠습니다 [%s]: "
-            "누적 %d개, 마지막 오류 %s: %s\n  마지막 응답: %s",
-            settings.MAX_RETRIES, QUIZ_TARGET_COUNT, settings.GCP_QUIZ_ENDPOINT,
-            len(collected), type(last_error).__name__, last_error, last_body,
+            "GCP 퀴즈 생성이 %d회 만에 분류를 모두 채우지 못했습니다 [%s]: "
+            "채워진 %s, 누락 %s, 마지막 오류 %s: %s\n  마지막 응답: %s",
+            settings.MAX_RETRIES, settings.GCP_QUIZ_ENDPOINT,
+            [_DEPTH_KO[d] for d in slots],
+            [_DEPTH_KO[d] for d in missing],
+            type(last_error).__name__, last_error, last_body,
         )
         raise HTTPException(status_code=502, detail="GCP 퀴즈 생성 실패")

@@ -252,3 +252,5 @@ dev-dist
 *.njsproj
 *.sln
 *.sw?
+
+*.pem

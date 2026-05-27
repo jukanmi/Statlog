@@ -1,4 +1,8 @@
+import os
+import sys
 from contextlib import asynccontextmanager
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel

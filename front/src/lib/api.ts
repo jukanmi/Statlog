@@ -81,7 +81,6 @@ export async function generateQuiz(content: string): Promise<Quiz[]> {
   }
 
   const data: QuizApiResponse = await res.json();
-  // 백엔드는 correct_index(snake_case) — 프론트 컨벤션(correctIndex)으로 변환
   return data.quizzes.map((q) => ({
     question: q.question,
     options: q.options,
@@ -137,4 +136,49 @@ export async function getUserProfile(token: string) {
       exp: 340,
     };
   }
+}
+
+// ================= 🧬 캐릭터 경험치 및 진화 정산 인터페이스 파트 =================
+
+export interface CharacterExpRequest {
+  characterId: string;
+  expGained: number;
+}
+
+export interface CharacterExpResponse {
+  characterId: string;
+  currentExp: number;
+  isEvolved: boolean;
+  evolvedToId: string | null;
+  message: string;
+}
+
+/**
+ * 📡 [API] 장착 마스코트의 경험치 적립 수치를 백엔드 DB와 동기화하고 진화 상태를 서버에서 검증합니다.
+ */
+export async function updateCharacterExpOnServer(payload: CharacterExpRequest): Promise<CharacterExpResponse> {
+  // 🔗 추후 실제 백엔드 연동 오픈 시 주석 해제하여 활성화
+  /*
+  const response = await fetch(`${API_BASE_URL}/api/v1/characters/gain-exp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      character_id: payload.characterId,
+      exp_gained: payload.expGained
+    })
+  });
+  if (!response.ok) throw new Error("캐릭터 경험치 동기화 실패");
+  return response.json();
+  */
+
+  // 🧪 [프론트엔드 단독 테스트 지원 가상 네트워크 딜레이 구현]
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  
+  return {
+    characterId: payload.characterId,
+    currentExp: payload.expGained,
+    isEvolved: false,
+    evolvedToId: null,
+    message: "로컬 모킹 API 가상 동기화 성공."
+  };
 }
