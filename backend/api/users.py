@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
 
+from core.db import get_db
 from core.security import decode_access_token
 from schemas.user import serialize_user
 from models.user import User
@@ -8,18 +10,16 @@ from models.user import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-# Swagger UI의 Authorize 버튼에서 토큰을 편하게 입력할 수 있도록 OAuth2PasswordBearer 사용
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/dev-login", auto_error=False)
 
 
-# TODO: 실제 DB를 연동하여 유저 정보를 조회하는 로직으로 교체해야 합니다.
-async def get_user_by_id(user_id: str):
-    # Mock 유저 객체 반환 (임시)
-    user = User(id=user_id, nickname="테스트유저")
-    return user
+def get_user_by_id(db: Session, user_id: str) -> User | None:
+    return db.query(User).filter_by(id=user_id).first()
+
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ):
     """
     Authorization: Bearer <access_token>에서 현재 유저를 가져오는 함수
@@ -39,7 +39,7 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="토큰에 user_id가 없습니다")
 
     # 아래 함수는 DB에서 user_id로 유저를 조회하도록 구현
-    user = await get_user_by_id(user_id)
+    user = get_user_by_id(db, user_id)
 
     if not user:
         raise HTTPException(status_code=401, detail="유저를 찾을 수 없습니다")

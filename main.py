@@ -16,13 +16,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import auth, users, analytics
 from services.oauth import close_http_client
 from api import parties, avatars
+from core.db import Base, engine
+import models.user
+import models.oauth_account
+import models.refresh_token
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
+    Base.metadata.create_all(bind=engine)
     yield
-    # shutdown
     await close_http_client()
 
 

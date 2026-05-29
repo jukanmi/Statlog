@@ -1,12 +1,15 @@
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import httpx
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from core.config import settings
+from core.db import get_db
 from core.security import (
     create_access_token,
     create_refresh_token,
@@ -14,9 +17,12 @@ from core.security import (
     hash_token,
     verify_oauth_state,
 )
+from models.user import User
+from models.oauth_account import OAuthAccount
+from models.refresh_token import RefreshToken
 from schemas.auth import OAuthCallbackRequest, OAuthUrlResponse, TokenResponse
 from schemas.user import serialize_user
-from services.oauth import build_oauth_url, exchange_code_for_token, fetch_oauth_user
+from services.oauth import OAuthUser, build_oauth_url, exchange_code_for_token, fetch_oauth_user
 
 
 logger = logging.getLogger(__name__)
@@ -25,12 +31,42 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-# TODO: DB 연동 후 실제 DB 기반 유저 생성 및 리프레시 토큰 저장 로직으로 교체해야 합니다.
-async def get_or_create_user_from_oauth(oauth_user: dict):
-    raise HTTPException(status_code=501, detail="유저 생성 및 조회 로직이 아직 구현되지 않았습니다.")
+def get_or_create_user_from_oauth(db: Session, oauth_user: OAuthUser) -> tuple[User, bool]:
+    account = (
+        db.query(OAuthAccount)
+        .filter_by(provider=oauth_user.provider, provider_user_id=oauth_user.provider_user_id)
+        .first()
+    )
 
-async def save_refresh_token(user_id: str, token_hash: str, expires_at: datetime):
-    pass  # 위 함수에서 501 에러가 발생하므로 여기서는 일단 pass 처리합니다.
+    if account:
+        user = db.query(User).filter_by(id=account.user_id).first()
+        return user, False
+
+    user = User(
+        id=str(uuid.uuid4()),
+        nickname=oauth_user.nickname,
+        email=oauth_user.email,
+        profile_image=oauth_user.profile_image,
+    )
+    db.add(user)
+    db.flush()
+
+    account = OAuthAccount(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        provider=oauth_user.provider,
+        provider_user_id=oauth_user.provider_user_id,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(user)
+
+    return user, True
+
+
+def save_refresh_token(db: Session, user_id: str, token_hash: str, expires_at: datetime) -> None:
+    db.add(RefreshToken(token_hash=token_hash, user_id=user_id, expires_at=expires_at))
+    db.commit()
 
 Provider = Literal["kakao", "google"]
 
@@ -85,6 +121,7 @@ async def get_oauth_url(
 async def oauth_callback(
     provider: Provider,
     body: OAuthCallbackRequest,
+    db: Session = Depends(get_db),
 ):
     """
     OAuth 콜백 처리 API
@@ -149,7 +186,7 @@ async def oauth_callback(
     # - 있으면 연결된 user 반환
     # - 없으면 users 생성 후 oauth_accounts 생성
     #
-    user, is_new_user = await get_or_create_user_from_oauth(oauth_user)
+    user, is_new_user = get_or_create_user_from_oauth(db, oauth_user)
 
     # 5. 서비스 access token 발급
     access_token = create_access_token(user_id=str(user.id))
@@ -163,7 +200,8 @@ async def oauth_callback(
     )
 
     # DB에는 refresh token 원문이 아니라 해시만 저장
-    await save_refresh_token(
+    save_refresh_token(
+        db=db,
         user_id=str(user.id),
         token_hash=refresh_token_hash,
         expires_at=expires_at,
