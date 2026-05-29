@@ -19,7 +19,7 @@ class QuizCreateRequest(BaseModel):
     correct_index: int | None = None
     answer: str | None = None
     hint: str | None = None
-    created_at: str
+    created_at: str | None = None
 
 
 class QuizVoteRequest(BaseModel):
