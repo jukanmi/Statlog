@@ -100,6 +100,7 @@ const HomePage: React.FC = () => {
   }, [todayMinutes]);
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
