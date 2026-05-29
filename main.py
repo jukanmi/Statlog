@@ -38,6 +38,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8080",  # Vite 개발 서버 (vite.config.ts의 server.port)
+	"http://54.180.155.190:8080",
     ],
     allow_credentials=True,
     allow_methods=["*"],
