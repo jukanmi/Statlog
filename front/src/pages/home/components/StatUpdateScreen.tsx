@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { useStudyStore } from '@/store/useStudyStore';
+import { syncUserToServer } from '@/lib/api';
 import type { Stats, AIStats } from '@/types';
 import type { StatConversionResult } from '@/lib/api';
 
@@ -59,58 +59,44 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
   error,
   onDone,
 }) => {
-  const userStats = useUserStore((s) => s.user.stats);
   const userAIStats = useUserStore((s) => s.user.aiStats);
-  const addStats = useUserStore((s) => s.addStats);
   const addAIStats = useUserStore((s) => s.addAIStats);
   const addExp = useUserStore((s) => s.addExp);
-  const lastSessionStats = useStudyStore((s) => s.lastSessionStats);
-  
   const [animated, setAnimated] = useState(false);
   const [applied, setApplied] = useState(false);
 
   // AI가 반환한 능력치 중 0보다 큰 항목만 추출 (Prop 우선, 없으면 Store 확인)
   const statGains: StatGain[] = [];
-  
+
+  console.log('[StatDebug] StatUpdateScreen props — loading:', loading, '/ error:', error, '/ statGained:', statGained);
+
   if (statGained) {
     STAT_KEYS.forEach((key) => {
       if ((statGained[key] ?? 0) > 0) {
         statGains.push({ key, delta: statGained[key] ?? 0 });
       }
     });
-  } else if (lastSessionStats) {
-    (Object.entries(lastSessionStats) as [AIStatKey, number][]).forEach(([key, delta]) => {
-      if (delta > 0) {
-        statGains.push({ key, delta });
-      }
-    });
   }
+  console.log('[StatDebug] statGains (0 초과 항목):', statGains);
 
-  const expGained = statGained?.EXP ?? lastSessionStats?.EXP ?? 0;
+  const expGained = statGained?.EXP ?? 0;
 
-  // statGained나 lastSessionStats가 도착하면 단 한 번만 스토어에 반영
+  // statGained가 도착하면 단 한 번만 스토어에 반영하고 서버 동기화
   useEffect(() => {
-    if (!applied) {
-      if (statGained) {
-        addStats(
-          STAT_KEYS.reduce<Partial<Stats>>((acc, key) => {
-            acc[key] = statGained[key] ?? 0;
-            return acc;
-          }, {})
-        );
-        addExp(statGained.EXP ?? 0);
-        setApplied(true);
-      } else if (lastSessionStats) {
-        addAIStats(lastSessionStats);
-        setApplied(true);
-      }
+    if (!applied && statGained) {
+      addAIStats(statGained);
+      addExp(statGained.EXP ?? 0);
+      setApplied(true);
+
+      const { user } = useUserStore.getState();
+      syncUserToServer({ ai_stats: user.aiStats, exp: user.exp });
     }
-  }, [statGained, lastSessionStats, applied, addStats, addAIStats, addExp]);
+  }, [statGained, applied, addAIStats, addExp]);
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 150);
     return () => clearTimeout(t);
-  }, [statGained, lastSessionStats]);
+  }, [statGained]);
 
   const containerStyle: React.CSSProperties = {
     position: 'fixed',
@@ -241,10 +227,7 @@ const StatUpdateScreen: React.FC<StatUpdateScreenProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, overflowY: 'auto' }}>
         {statGains.length > 0 ? (
         statGains.map(({ key, delta }) => {
-          // Use userStats if it's a standard stat, else userAIStats
-          const currentValue = STAT_KEYS.includes(key as StatKey) 
-            ? userStats[key as StatKey] 
-            : userAIStats[key as AIStatKey] ?? 0;
+          const currentValue = userAIStats[key as AIStatKey] ?? 0;
           
           const barWidth = animated ? `${Math.min(currentValue, 100)}%` : '0%';
 

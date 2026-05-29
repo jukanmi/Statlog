@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useUserStore, type AttendanceReward } from '@/store/useUserStore';
+import { useStudyStore } from '@/store/useStudyStore';
+import { syncUserToServer } from '@/lib/api';
 
 interface Props {
   onClose: () => void;
@@ -14,6 +16,14 @@ const AttendanceModal: React.FC<Props> = ({ onClose }) => {
   const handleClaim = () => {
     claimAttendance();
     setClaimed(true);
+    const { user } = useUserStore.getState();
+    const { studyStreak } = useStudyStore.getState();
+    syncUserToServer({
+      gold: user.gold,
+      gems: user.gems,
+      last_attendance_date: new Date().toLocaleDateString('en-CA'),
+      study_streak: studyStreak,
+    });
   };
 
   return (

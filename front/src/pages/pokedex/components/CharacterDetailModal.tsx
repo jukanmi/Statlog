@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { type GachaCharacter, GRADE_COLORS } from '@/lib/gachaSystem';
-import { useUserStore } from '@/store/useUserStore'; // 🎴 유저 스토어 임포트
+import { useUserStore } from '@/store/useUserStore';
+import { syncUserToServer, encodeBitmask } from '@/lib/api';
 
 interface CharacterDetailModalProps {
   character: GachaCharacter | null;
@@ -38,6 +39,12 @@ const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({ character, 
   const handleEquip = () => {
     if (isOwned && !isEquipped) {
       equipCharacter(character.id);
+      const { ownedCharacterIds, characterExpMap } = useUserStore.getState();
+      syncUserToServer({
+        equipped_character_id: character.id,
+        owned_characters_bits: encodeBitmask(ownedCharacterIds),
+        character_exp_map: characterExpMap,
+      });
     }
   };
 

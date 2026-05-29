@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { User, LogOut, Trash2, ChevronRight, Check, Target } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
+import { useQuestStore } from '@/store/useQuestStore';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -10,7 +11,8 @@ interface SettingsModalProps {
 type ConfirmType = 'logout' | 'delete' | null;
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
-  const { user, updateNickname, updateProfileImage, dailyStudyGoalMinutes, updateDailyStudyGoal, dataCollectionConsent, setConsent } = useUserStore();
+  const { user, updateNickname, updateProfileImage, dataCollectionConsent, setConsent } = useUserStore();
+  const { dailyStudyGoalMinutes, updateDailyStudyGoal } = useQuestStore();
   const [editingNick, setEditingNick] = useState(false);
   const [nickValue, setNickValue] = useState(user.nickname);
   const [editingGoal, setEditingGoal] = useState(false);

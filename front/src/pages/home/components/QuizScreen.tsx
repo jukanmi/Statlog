@@ -5,8 +5,8 @@ import { useStudyStore } from '@/store/useStudyStore';
 
 interface QuizScreenProps {
   subject: string;
-  content: string; // 사용자가 입력한 학습 내용 — AI 퀴즈 생성의 입력
-  onComplete: (correctCount: number) => void;
+  content: string;
+  onComplete: (correctResults: boolean[]) => void;
   onSkip: () => void;
 }
 
@@ -35,11 +35,10 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [correctCount, setCorrectCount] = useState(0);
+  const [correctResults, setCorrectResults] = useState<boolean[]>([]);
   const [advancing, setAdvancing] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
-  const correctAtSelect = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalQuestions = quizzes?.length || 0;
@@ -51,10 +50,8 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
       setQuizzes(lastSessionQuizFromStore.map(item => ({
         question: item.question,
         options: item.choices,
-        correctIndex: OPTION_LABELS.indexOf(item.answer as any) !== -1 
-          ? OPTION_LABELS.indexOf(item.answer as any) 
-          : 0,
-        explanation: item.explanation
+        correctIndex: item.correctIndex,
+        explanation: item.explanation,
       })));
       return;
     }
@@ -105,6 +102,8 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
 
   const handleTimeout = () => {
     setSelectedIndex(-1);
+    const newResults = [...correctResults, false];
+    setCorrectResults(newResults);
     setAdvancing(true);
     timeoutRef.current = setTimeout(() => {
       if (currentIndex < quizzes!.length - 1) {
@@ -112,7 +111,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
         setSelectedIndex(null);
         setAdvancing(false);
       } else {
-        onComplete(correctCount);
+        onComplete(newResults);
       }
     }, 1500);
   };
@@ -154,33 +153,29 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   const handleSelect = (optionIndex: number) => {
     if (selectedIndex !== null || advancing) return;
     setSelectedIndex(optionIndex);
-
-    const isCorrect = optionIndex === quiz.correctIndex;
-    const newCount = correctAtSelect.current + (isCorrect ? 1 : 0);
-    if (isCorrect) setCorrectCount(newCount);
-    
-    // Show explanation after selection
     setShowExplanation(true);
   };
 
   const handleNext = () => {
     if (selectedIndex === null) return;
-    
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    
+
+    const isCorrect = selectedIndex === quiz.correctIndex;
+    const newResults = [...correctResults, isCorrect];
+    setCorrectResults(newResults);
     setAdvancing(true);
     setShowExplanation(false);
 
     if (currentIndex < totalQuestions - 1) {
-      correctAtSelect.current = correctCount;
       setCurrentIndex((p) => p + 1);
       setSelectedIndex(null);
       setAdvancing(false);
     } else {
-      onComplete(correctCount);
+      onComplete(newResults);
     }
   };
 
