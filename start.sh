@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "[1/2] Starting backend (uvicorn :8000)..."
-nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
+nohup python -m uvicorn main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
 echo "  backend PID: $!"
 
 echo "[2/2] Starting frontend (vite :8080)..."
