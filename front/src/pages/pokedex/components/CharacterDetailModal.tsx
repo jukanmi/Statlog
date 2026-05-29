@@ -37,7 +37,7 @@ const CharacterDetailModal: React.FC<CharacterDetailModalProps> = ({ character, 
   const isEquipped = equippedCharacterId === character.id;
 
   const handleEquip = () => {
-    if (isOwned && !isEquipped) {
+    if (character && isOwned && !isEquipped) {
       equipCharacter(character.id);
       const { ownedCharacterIds, characterExpMap } = useUserStore.getState();
       syncUserToServer({
