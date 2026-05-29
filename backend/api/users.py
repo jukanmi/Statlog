@@ -51,8 +51,10 @@ async def update_me(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    allowed_fields = {"nickname", "profile_image"}
     for field, value in body.model_dump(exclude_none=True).items():
-        setattr(current_user, field, value)
+        if field in allowed_fields:
+            setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
     return serialize_user(current_user)
