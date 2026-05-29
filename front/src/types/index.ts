@@ -21,7 +21,7 @@ export interface AIStats {
 export interface AIQuizItem {
   question: string;
   choices: string[];
-  answer: string;
+  correctIndex: number;
   explanation: string;
 }
 
@@ -46,6 +46,22 @@ export interface StudySession {
   statGained: Partial<Stats>;
   expGained?: number;
   aiStatGained?: Partial<AIStats>;
+}
+
+export type QuizType = 'multiple' | 'short';
+
+export interface UserQuiz {
+  id: string;
+  createdAt: string;
+  subject: string;
+  type: QuizType;
+  question: string;
+  // 객관식
+  options?: string[];
+  correctIndex?: number;
+  // 주관식
+  answer?: string;
+  hint?: string;
 }
 
 export interface Character {

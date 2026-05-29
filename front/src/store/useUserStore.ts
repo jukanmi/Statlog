@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Stats } from '@/types';
 import { EVOLUTION_CHAIN, ALL_CHARACTERS } from '@/lib/gachaSystem';
-import { updateCharacterExpOnServer } from '@/lib/api';
+import { updateCharacterExpOnServer, syncUserToServer, encodeBitmask } from '@/lib/api';
 
 export interface AttendanceReward {
   gold: number;
@@ -163,10 +163,17 @@ export const useUserStore = create<UserState>()(
           // 비동기 작업 동안 유저가 대표 캐릭터를 수동으로 바꾸지 않은 경우에만 자동 장착
           const shouldUpdateEquipped = equippedCharacterId === initialEquippedId;
 
+          const newEquippedId = shouldUpdateEquipped ? nextEvolutionId : equippedCharacterId;
           set({
             characterExpMap: updatedExpMap,
             ownedCharacterIds: updatedOwnedIds,
             ...(shouldUpdateEquipped ? { equippedCharacterId: nextEvolutionId } : {})
+          });
+
+          syncUserToServer({
+            owned_characters_bits: encodeBitmask(updatedOwnedIds),
+            equipped_character_id: newEquippedId ?? undefined,
+            character_exp_map: updatedExpMap,
           });
 
           return {
