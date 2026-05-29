@@ -1,5 +1,8 @@
+import logging
 import math
 from typing import Literal
+
+logger = logging.getLogger("AI_routers.ai_log")
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
@@ -116,6 +119,8 @@ async def analyze_log_to_stats(
     5. 분배된 능력치 합계 × 깊이 가중치로 EXP를 계산한다.
     """
     if quiz_results is not None and _quiz_below_stat_threshold(quiz_results):
+        logger.info("[StatDebug] 퀴즈 게이트 차단 — 정답 수: %d / 임계치: %d",
+                    sum(1 for r in quiz_results if r), settings.QUIZ_MIN_CORRECT_FOR_STATS)
         return StatResponse()
     payload = await AIService.request_stat_conversion(log_text)
     percentages = {key: max(0, getattr(payload, key)) for key in STAT_KEYS}
@@ -127,6 +132,16 @@ async def analyze_log_to_stats(
         else payload.depth
     )
     exp = _calculate_exp(stats, depth)
+
+    logger.info(
+        "[StatDebug] log_text=%r | duration=%d분 | quiz=%s\n"
+        "  LLM 백분율: %s (합계=%d)\n"
+        "  budget=%.2f | 분배 결과: %s | depth=%s | EXP=%d",
+        log_text[:60], duration_minutes, quiz_results,
+        percentages, sum(percentages.values()),
+        budget, stats, depth, exp,
+    )
+
     return StatResponse(**stats, EXP=exp)
 
 

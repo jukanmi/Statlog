@@ -8,18 +8,24 @@ from contextlib import asynccontextmanager
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
-from fastapi import FastAPI, HTTPException
+import uuid
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict
+from sqlalchemy.orm import Session
 from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
 from fastapi.middleware.cors import CORSMiddleware
-from api import auth, users, analytics
+from api import auth, users, analytics, quizzes
+from api.users import get_current_user
 from services.oauth import close_http_client
 from api import parties, avatars
-from core.db import Base, engine
+from core.db import Base, engine, get_db
 import models.user
 import models.oauth_account
 import models.refresh_token
+import models.study_session
+import models.user_quiz
+from models.study_session import StudySession
 
 
 @asynccontextmanager
@@ -48,6 +54,9 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(parties.router, prefix="/api/v1")
 app.include_router(avatars.router, prefix="/api/v1")
+app.include_router(quizzes.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
 
 
 @app.get("/health")
@@ -90,12 +99,62 @@ class StudySessionRequest(BaseModel):
     content: str
     duration_minutes: int
     date: str
+    quiz_results: list[bool] | None = None
+
+@app.get("/api/v1/study/sessions")
+async def get_study_sessions(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    sessions = (
+        db.query(StudySession)
+        .filter_by(user_id=current_user.id)
+        .order_by(StudySession.date.asc())
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "subject": s.subject,
+            "content": s.content,
+            "duration_minutes": s.duration_minutes,
+            "date": s.date,
+        }
+        for s in sessions
+    ]
+
 
 @app.post("/api/v1/study/sessions", status_code=201)
-async def save_study_session(session: StudySessionRequest):
-    stat_gained = await analyze_log_to_stats(session.content, session.duration_minutes)
+async def save_study_session(
+    session: StudySessionRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import logging as _logging
+    _logger = _logging.getLogger("main.study_sessions")
+
+    try:
+        stat_gained = await analyze_log_to_stats(
+            session.content, session.duration_minutes, session.quiz_results
+        )
+    except Exception as e:
+        _logger.error("[StatDebug] analyze_log_to_stats 실패: %s: %s", type(e).__name__, e)
+        stat_gained = StatResponse()
+
+    record = StudySession(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        subject=session.subject,
+        content=session.content,
+        duration_minutes=session.duration_minutes,
+        date=session.date,
+    )
+    db.add(record)
+    db.commit()
+
+    _logger.info("[StatDebug] 세션 저장 완료 — stat_gained: %s", stat_gained)
     return {
-        "id": "session-123",
-        "subject": session.subject,
-        "stat_gained": stat_gained
+        "id": record.id,
+        "subject": record.subject,
+        "stat_gained": stat_gained,
     }
