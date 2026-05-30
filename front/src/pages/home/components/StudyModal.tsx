@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { StudySession } from '@/types';
-import { convertStudyToStats } from '@/lib/api';
+import { syncUserToServer, encodeBitmask } from '@/lib/api';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import { generateStats, generateQuiz } from '@/lib/aiApi';
-import type { AIStats, AIQuizItem } from '@/types';
+import { generateQuiz } from '@/lib/aiApi';
+import type { AIQuizItem } from '@/types';
 import { Loader2 } from 'lucide-react';
 
 interface StudyModalProps {
@@ -57,52 +57,31 @@ const StudyModal: React.FC<StudyModalProps> = ({
     }
 
     setIsGenerating(true);
-    let aiStats: AIStats | undefined;
     let aiQuiz: AIQuizItem[] | undefined;
 
     try {
-      // 1. Generate Stats and Quiz in parallel
-      [aiStats, aiQuiz] = await Promise.all([
-        generateStats(content),
-        generateQuiz(content)
-      ]);
+      const quizResult = await generateQuiz(content);
+      aiQuiz = quizResult;
     } catch (error) {
-      console.error('AI Generation failed or timed out:', error);
-      // Graceful fallback: we will proceed without AI data, 
-      // which will cause QuizScreen to use fallback quizzes and StatUpdateScreen to show 0 gains.
+      console.error('generateQuiz 실패:', error);
       alert('AI 처리에 실패하여 기본 퀴즈로 대체합니다.');
     } finally {
       setIsGenerating(false);
     }
 
-    // 2. Save session
+    // 2. Save session to DB (stat_gained는 퀴즈 정답 후 별도 요청)
     const session: StudySession = {
       id: crypto.randomUUID(),
       subject,
       content,
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
       date: new Date().toISOString().split('T')[0],
-      statGained: {}, // legacy stats
-      aiStatGained: aiStats, // might be undefined if failed
+      statGained: {},
+      aiStatGained: undefined,
     };
 
-    try {
-      const statGained = await convertStudyToStats({
-        subject: session.subject,
-        content: session.content,
-        durationMinutes: session.durationMinutes,
-        date: session.date,
-      });
-      useUserStore.getState().addStats(statGained);
-      useUserStore.getState().addExp(statGained.EXP);
-      session.statGained = statGained; // Update session with actual stats
-    } catch (error) {
-      console.error('Failed to convert study to stats:', error);
-      // Optionally, handle error state or show a user notification
-    }
-
     if (useUserStore.getState().dataCollectionConsent) {
-      fetch(import.meta.env.VITE_API_URL + '/analytics/study-session', {
+      fetch(import.meta.env.VITE_API_URL + '/api/v1/analytics/study-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,10 +92,20 @@ const StudyModal: React.FC<StudyModalProps> = ({
       }).catch(err => console.error('Failed to send anonymous analytics:', err));
     }
 
-    // 3. Update store with AI results (or null to clear previous)
-    setLastSessionStats(aiStats || null);
+    // 3. 퀴즈 저장, 스탯은 퀴즈 정답 후 요청하므로 null로 초기화
+    setLastSessionStats(null);
     setLastSessionQuiz(aiQuiz || null);
-    addSession(session);
+    addSession(session);  // ← 여기서 studyStreak 업데이트됨
+
+    // 4. addSession 이후 최신 studyStreak 읽기
+    const { ownedCharacterIds, equippedCharacterId, characterExpMap } = useUserStore.getState();
+    const { studyStreak } = useStudyStore.getState();
+    syncUserToServer({
+      study_streak: studyStreak,
+      owned_characters_bits: encodeBitmask(ownedCharacterIds),
+      equipped_character_id: equippedCharacterId,
+      character_exp_map: characterExpMap,
+    });
 
     setContent('');
     setSubject('수학');

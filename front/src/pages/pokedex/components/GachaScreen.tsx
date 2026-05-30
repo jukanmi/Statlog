@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { pullOne, pullTen, type GachaCharacter } from '@/lib/gachaSystem';
+import { syncUserToServer, encodeBitmask } from '@/lib/api';
 import GachaResultModal from './GachaResultModal';
 
 interface GachaScreenProps {
@@ -88,6 +89,14 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
 
     setResult({ characters, newIds });
     setIsResultOpen(true);
+
+    const { ownedCharacterIds, equippedCharacterId, user } = useUserStore.getState();
+    syncUserToServer({
+      gold: user.gold,
+      gems: user.gems,
+      owned_characters_bits: encodeBitmask(ownedCharacterIds),
+      equipped_character_id: equippedCharacterId,
+    });
   };
 
   const handleClose = () => {

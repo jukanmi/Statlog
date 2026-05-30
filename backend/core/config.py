@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # JWT 설정
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 180
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     # Kakao OAuth 설정

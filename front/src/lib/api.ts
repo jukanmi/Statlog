@@ -29,9 +29,13 @@ export async function convertStudyToStats(
   payload: StudySessionPayload
 ): Promise<StatConversionResult> {
   try {
+    const token = localStorage.getItem('access_token');
     const res = await fetch(`${API_BASE_URL}/api/v1/study/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         subject: payload.subject,
         content: payload.content,
@@ -103,27 +107,37 @@ export async function getUserProfile(token: string) {
       },
     });
 
+    // 401/403은 토큰 무효 — 상위에서 로그아웃 처리하도록 throw
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`UNAUTHORIZED`);
+    }
+
     if (!res.ok) {
       throw new Error(`프로필 조회 실패 (HTTP ${res.status})`);
     }
 
     const data = await res.json();
-    
-    // 백엔드 데이터에 필수 필드(stats 등)가 없을 경우 Mock과 합성
     return {
       id: data.id || 'user-001',
       nickname: data.nickname || '탐험가',
       profileImage: data.profile_image || null,
-      stats: data.stats || { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0 },
-      aiStats: data.aiStats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
-      gold: data.gold ?? 1200,
+      stats: data.stats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0 },
+      aiStats: data.ai_stats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
+      gold: data.gold ?? 1000,
       gems: data.gems ?? 30,
-      level: data.level ?? 7,
-      exp: data.exp ?? 340,
+      level: data.level ?? 1,
+      exp: data.exp ?? 0,
+      owned_characters_bits: data.owned_characters_bits ?? 7,
+      equipped_character_id: data.equipped_character_id ?? 'char_1',
+      character_exp_map: data.character_exp_map ?? {},
+      study_streak: data.study_streak ?? 0,
+      last_attendance_date: data.last_attendance_date ?? null,
     };
   } catch (error) {
+    // UNAUTHORIZED는 다시 throw → initializeAuth에서 토큰 삭제
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') throw error;
     console.warn('Backend profile API failed, using mock data:', error);
-    // 백엔드가 아예 안 켜져 있거나 401/404일 때 반환할 완전한 Mock 데이터
+    // 서버가 꺼져 있는 경우만 mock fallback
     return {
       id: 'user-001',
       nickname: '탐험가(Mock)',
@@ -135,6 +149,175 @@ export async function getUserProfile(token: string) {
       level: 7,
       exp: 340,
     };
+  }
+}
+
+export async function saveStudySessionWithStats(payload: {
+  subject: string;
+  content: string;
+  durationMinutes: number;
+  date: string;
+  quizResults: boolean[];
+}): Promise<StatConversionResult> {
+  const token = localStorage.getItem('access_token');
+  const res = await fetch(`${API_BASE_URL}/api/v1/study/sessions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      subject: payload.subject,
+      content: payload.content,
+      duration_minutes: payload.durationMinutes,
+      date: payload.date,
+      quiz_results: payload.quizResults,
+    }),
+  });
+  if (!res.ok) throw new Error(`세션 저장 실패 (HTTP ${res.status})`);
+  const data = await res.json();
+  console.log('[StatDebug] /study/sessions 원본 응답:', data);
+  return data.stat_gained as StatConversionResult;
+}
+
+// ================= 유저 퀴즈 =================
+
+export async function fetchUserQuizzes() {
+  const token = localStorage.getItem('access_token');
+  if (!token) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/quizzes`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
+}
+
+export async function saveQuizToServer(quiz: {
+  id: string; subject: string; type: string; question: string;
+  options?: string[]; correct_index?: number;
+  answer?: string; hint?: string; created_at: string;
+}) {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/quizzes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(quiz),
+    });
+  } catch (e) { console.warn('퀴즈 저장 실패:', e); }
+}
+
+export async function deleteQuizFromServer(quizId: string) {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/quizzes/${quizId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) { console.warn('퀴즈 삭제 실패:', e); }
+}
+
+export async function voteQuizOnServer(quizId: string, vote: 'up' | 'down') {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/quizzes/${quizId}/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ vote }),
+    });
+  } catch (e) { console.warn('퀴즈 투표 실패:', e); }
+}
+
+export async function reportQuizOnServer(quizId: string) {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/quizzes/${quizId}/report`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) { console.warn('퀴즈 신고 실패:', e); }
+}
+
+// ================= 공부 세션 =================
+
+export interface ServerStudySession {
+  id: string;
+  subject: string;
+  content: string;
+  duration_minutes: number;
+  date: string;
+}
+
+export async function fetchStudySessions(): Promise<ServerStudySession[]> {
+  const token = localStorage.getItem('access_token');
+  if (!token) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/study/sessions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ================= 캐릭터 비트마스크 유틸 =================
+// char_N → bit(N-1): char_1=1, char_2=2, char_3=4, ..., char_12=2048
+
+export function encodeBitmask(characterIds: string[]): number {
+  return characterIds.reduce((bits, id) => {
+    const n = parseInt(id.replace('char_', ''), 10);
+    return isNaN(n) ? bits : bits | (1 << (n - 1));
+  }, 0);
+}
+
+export function decodeBitmask(bits: number): string[] {
+  const ids: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    if (bits & (1 << i)) ids.push(`char_${i + 1}`);
+  }
+  return ids;
+}
+
+// ================= 유저 상태 서버 동기화 =================
+
+export interface UserSyncPayload {
+  gold?: number;
+  gems?: number;
+  level?: number;
+  exp?: number;
+  study_streak?: number;
+  last_attendance_date?: string | null;
+  stats?: Record<string, number>;
+  ai_stats?: Record<string, number>;
+  nickname?: string;
+  profile_image?: string | null;
+  owned_characters_bits?: number;
+  equipped_character_id?: string | null;
+  character_exp_map?: Record<string, number>;
+}
+
+export async function syncUserToServer(payload: UserSyncPayload): Promise<void> {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.warn('유저 상태 동기화 실패:', e);
   }
 }
 

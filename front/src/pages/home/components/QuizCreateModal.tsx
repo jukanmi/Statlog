@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuizStore } from '@/store/useQuizStore';
 import type { QuizType } from '@/types';
-import { generateQuiz } from '@/lib/api';
+import { generateQuiz, saveQuizToServer } from '@/lib/api';
 
 const SUBJECTS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'] as const;
 
@@ -117,22 +117,14 @@ const QuizCreateModal: React.FC<QuizCreateModalProps> = ({ isOpen, onClose, onCr
 
   const handleSaveManual = () => {
     if (!canSaveManual) return;
+    const createdAt = new Date().toISOString();
+    const id = `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     if (quizType === 'multiple') {
-      addQuiz({
-        subject,
-        type: 'multiple',
-        question: question.trim(),
-        options: options.map((o) => o.trim()),
-        correctIndex: correctOptionIndex!,
-      });
+      addQuiz({ subject, type: 'multiple', question: question.trim(), options: options.map((o) => o.trim()), correctIndex: correctOptionIndex! });
+      saveQuizToServer({ id, subject, type: 'multiple', question: question.trim(), options: options.map((o) => o.trim()), correct_index: correctOptionIndex!, created_at: createdAt });
     } else {
-      addQuiz({
-        subject,
-        type: 'short',
-        question: question.trim(),
-        answer: answer.trim(),
-        hint: hint.trim() || undefined,
-      });
+      addQuiz({ subject, type: 'short', question: question.trim(), answer: answer.trim(), hint: hint.trim() || undefined });
+      saveQuizToServer({ id, subject, type: 'short', question: question.trim(), answer: answer.trim(), hint: hint.trim() || undefined, created_at: createdAt });
     }
     onClose();
     onCreated();
@@ -145,13 +137,10 @@ const QuizCreateModal: React.FC<QuizCreateModalProps> = ({ isOpen, onClose, onCr
     try {
       const generatedQuizzes = await generateQuiz(aiContent);
       generatedQuizzes.forEach((q) => {
-        addQuiz({
-          subject,
-          type: 'multiple',
-          question: q.question,
-          options: q.options,
-          correctIndex: q.correctIndex,
-        });
+        const id = `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const createdAt = new Date().toISOString();
+        addQuiz({ subject, type: 'multiple', question: q.question, options: q.options, correctIndex: q.correctIndex });
+        saveQuizToServer({ id, subject, type: 'multiple', question: q.question, options: q.options, correct_index: q.correctIndex, created_at: createdAt });
       });
       onClose();
       onCreated();

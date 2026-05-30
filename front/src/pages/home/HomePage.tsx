@@ -14,12 +14,13 @@ import PomodoroIndicator from './components/PomodoroIndicator';
 import PomodoroNoticeOverlay, { type PomodoroNotice } from './components/PomodoroNoticeOverlay';
 import TimerActionButtons from './components/TimerActionButtons';
 import QuestGoalModal from './components/QuestGoalModal';
-import { convertStudyToStats, type StatConversionResult } from '@/lib/api';
+import { type StatConversionResult, saveStudySessionWithStats } from '@/lib/api';
 import QuizCreateModal from './components/QuizCreateModal';
 import QuizListModal from './components/QuizListModal';
 import StreakBonusModal from './components/StreakBonusModal';
 import BurnoutWarningModal from './components/BurnoutWarningModal';
 import { useUserStore } from '@/store/useUserStore';
+import { syncUserToServer } from '@/lib/api';
 import { ALL_CHARACTERS } from '@/lib/gachaSystem'; // 🦉 캐릭터 리스트 임포트
 
 const BURNOUT_THRESHOLD_MINUTES = 180; // 3시간
@@ -74,7 +75,7 @@ const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
   const [savedElapsedSeconds, setSavedElapsedSeconds] = useState(0);
-  const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+  const [quizCorrectResults, setQuizCorrectResults] = useState<boolean[]>([]);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [showQuizList, setShowQuizList] = useState(false);
   const [showStreakBonus, setShowStreakBonus] = useState(false);
@@ -98,20 +99,45 @@ const HomePage: React.FC = () => {
     }
   }, [todayMinutes]);
 
-  const fetchStatGained = async (elapsed: number) => {
-    setStatLoading(true);
-    setStatError(null);
-    setStatGained(null);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        useStudyStore.setState((s) => ({
+          accumulatedSeconds: s.accumulatedSeconds + 300,
+          startedAt: s.startedAt ? s.startedAt - 300_000 : s.startedAt,
+        }));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const saveSessionAndFetchStats = async (quizResults: boolean[]) => {
+    const { sessions } = useStudyStore.getState();
+    const lastSession = sessions[sessions.length - 1];
+    console.log('[StatDebug] sessions 길이:', sessions.length, '/ lastSession:', lastSession);
+    console.log('[StatDebug] quizResults:', quizResults);
+    if (!lastSession) {
+      console.warn('[StatDebug] lastSession 없음 — 스탯 요청 건너뜀');
+      setStatLoading(false);
+      return;
+    }
     try {
-      const result = await convertStudyToStats({
-        subject: currentSubject || '기타',
-        content: currentContent,
-        durationMinutes: Math.max(1, Math.round(elapsed / 60)),
-        date: new Date().toLocaleDateString('en-CA'),
+      const stats = await saveStudySessionWithStats({
+        subject: lastSession.subject,
+        content: lastSession.content,
+        durationMinutes: lastSession.durationMinutes,
+        date: lastSession.date,
+        quizResults,
       });
-      setStatGained(result);
+      console.log('[StatDebug] 서버 stat_gained 응답:', stats);
+      setStatGained(stats);
+      useStudyStore.setState({ lastSessionStats: stats });
     } catch (e) {
-      setStatError(e instanceof Error ? e.message : '스탯 변환에 실패했어요');
+      console.error('[StatDebug] 세션 저장/스탯 요청 실패:', e);
+      setStatError('스탯 분석에 실패했어요');
     } finally {
       setStatLoading(false);
     }
@@ -165,12 +191,13 @@ const HomePage: React.FC = () => {
     resetTimer();
   };
 
-  const handleQuizComplete = (correctCount: number) => {
-    setQuizCorrectCount(correctCount);
+  const handleQuizComplete = (correctResults: boolean[]) => {
+    setQuizCorrectResults(correctResults);
     setScreen('result');
-    if (correctCount > 0) {
-      void fetchStatGained(savedElapsedSeconds);
-    }
+    setStatLoading(true);
+    setStatGained(null);
+    setStatError(null);
+    void saveSessionAndFetchStats(correctResults);
   };
 
   const handleQuizSkip = () => setScreen('stat');
@@ -214,7 +241,7 @@ const HomePage: React.FC = () => {
   if (screen === 'result') {
     return (
       <ResultScreen
-        correctCount={quizCorrectCount}
+        correctCount={quizCorrectResults.filter(Boolean).length}
         totalCount={lastSessionQuiz?.length || 3}
         onContinue={handleResultContinue}
       />
@@ -297,7 +324,11 @@ const HomePage: React.FC = () => {
             targetProgress={dailyStudyGoalMinutes}
             reward={{ gold: 50, gems: 5 }}
             isClaimed={dailyQuestStatus['daily_study_1h']?.isClaimed || false}
-            onClaim={claimDailyQuest}
+            onClaim={(questId, reward) => {
+              claimDailyQuest(questId, reward);
+              const { user } = useUserStore.getState();
+              syncUserToServer({ gold: user.gold, gems: user.gems });
+            }}
             onEditTarget={handleEditTarget}
           />
         </div>

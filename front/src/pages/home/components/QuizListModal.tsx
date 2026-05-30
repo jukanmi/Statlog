@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuizStore, OFFICIAL_UPVOTE_THRESHOLD } from '@/store/useQuizStore';
 import type { UserQuiz } from '@/types';
+import { deleteQuizFromServer, voteQuizOnServer, reportQuizOnServer } from '@/lib/api';
 
 const SUBJECT_COLORS: Record<string, string> = {
   수학: '#4ADE80',
@@ -73,6 +74,7 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
 
   const handleDelete = (quiz: UserQuiz) => {
     deleteQuiz(quiz.id);
+    deleteQuizFromServer(quiz.id);
     showToast('퀴즈가 삭제됐어요');
   };
 
@@ -80,6 +82,7 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
     const prevVote = userVotes[quiz.id];
     voteQuiz(quiz.id, type);
     if (prevVote === type) return;
+    voteQuizOnServer(quiz.id, type);
 
     const upCount = (upvotes[quiz.id] ?? 0) + (type === 'up' ? 1 : 0);
     if (type === 'up' && upCount >= OFFICIAL_UPVOTE_THRESHOLD && !officialIds.includes(quiz.id)) {
@@ -95,6 +98,7 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
       return;
     }
     reportQuiz(quiz.id);
+    reportQuizOnServer(quiz.id);
     const newCount = (reportCounts[quiz.id] ?? 0) + 1;
     if (newCount >= 3) {
       showToast('신고가 접수됐어요. 문제가 숨겨졌어요');
