@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { StudySession, AIStats, AIQuizItem } from '@/types';
+import type { StudySession, AIStats } from '@/types';
+import type { Quiz } from '@/lib/api';
 
 
 type TimerState = 'idle' | 'studying' | 'paused';
@@ -25,7 +26,7 @@ interface StudyState {
   streakBonusPending: boolean;
   // AI results from the last finished session
   lastSessionStats: AIStats | null;
-  lastSessionQuiz: AIQuizItem[] | null;
+  lastSessionQuiz: Quiz[] | null;
   // Timer state (persists across tab switches)
   timerState: TimerState;
   startedAt: number | null;
@@ -39,7 +40,7 @@ interface StudyState {
   checkDayReset: () => void;
   clearStreakBonus: () => void;
   setLastSessionStats: (stats: AIStats | null) => void;
-  setLastSessionQuiz: (quiz: AIQuizItem[] | null) => void;
+  setLastSessionQuiz: (quiz: Quiz[] | null) => void;
 }
 
 export const useStudyStore = create<StudyState>()(

@@ -47,12 +47,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   // 2. Store에 퀴즈가 없고 학습 내용이 있다면 AI 퀴즈 생성 시도 (Legacy/Fallback)
   useEffect(() => {
     if (lastSessionQuizFromStore && lastSessionQuizFromStore.length > 0) {
-      setQuizzes(lastSessionQuizFromStore.map(item => ({
-        question: item.question,
-        options: item.choices,
-        correctIndex: item.correctIndex,
-        explanation: item.explanation,
-      })));
+      setQuizzes(lastSessionQuizFromStore);
       return;
     }
 
@@ -380,7 +375,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
       </div>
 
       {/* Explanation */}
-      {showExplanation && (quiz as any).explanation && (
+      {showExplanation && quiz.explanation && (
         <div
           style={{
             backgroundColor: 'rgba(201,168,76,0.05)',
@@ -393,7 +388,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: '#C9A84C', marginBottom: 6 }}>해설</div>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5 }}>
-            {(quiz as any).explanation}
+            {quiz.explanation}
           </p>
         </div>
       )}

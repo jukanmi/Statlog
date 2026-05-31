@@ -3,8 +3,7 @@ import type { StudySession } from '@/types';
 import { syncUserToServer, encodeBitmask } from '@/lib/api';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import { generateQuiz } from '@/lib/aiApi';
-import type { AIQuizItem } from '@/types';
+import { generateQuiz, type Quiz } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 interface StudyModalProps {
@@ -57,7 +56,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
     }
 
     setIsGenerating(true);
-    let aiQuiz: AIQuizItem[] | undefined;
+    let aiQuiz: Quiz[] | undefined;
 
     try {
       const quizResult = await generateQuiz(content);

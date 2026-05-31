@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 import uuid
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,37 +63,12 @@ app.include_router(ai_router, prefix="/api/v1")
 def health_check():
     return {"status": "ok"}
 
-# --- 데이터 모델 (프론트 명세서 기반) ---
-
-# 스탯클래스 /AI_routers/ai_log.py로 이동
-
-class User(BaseModel):
-    id: str
-    nickname: str
-    profile_image: Optional[str] = None
-    stats: StatResponse
-    gold: int
-    gems: int
-    level: int
-    exp: int
-
 # --- API 엔드포인트 ---
 
-# 1. 내 프로필 조회 (Dashboard용)
-@app.get("/api/v1/users/me", response_model=User)
-async def get_my_profile():
-    # 실제 DB 연동 전까지 줄 가짜 데이터
-    return {
-        "id": "user-001",
-        "nickname": "학습왕",
-        "stats": {"HUM": 50, "SOC": 0, "NAT": 10, "COL": 0, "PER": 0, "ART": 0},
-        "gold": 1000,
-        "gems": 50,
-        "level": 1,
-        "exp": 0
-    }
+# 스탯 클래스는 /AI_routers/ai_log.py(StatResponse)로 이동.
+# 프로필 조회(/users/me)는 api/users.py 라우터가 실제 DB 기반으로 처리한다.
 
-# 2. 학습 세션 저장 (StudyModal용)
+# 학습 세션 저장 (StudyModal용)
 class StudySessionRequest(BaseModel):
     subject: str
     content: str
@@ -151,9 +125,22 @@ async def save_study_session(
         date=session.date,
     )
     db.add(record)
+
+    # 획득 스탯을 서버가 직접 user에 누적·영속화한다 (진실의 원천 = 서버).
+    # ai_stats: 6대 능력치 + EXP 맵, exp: 별도 정수 컬럼.
+    gained = stat_gained.model_dump()
+    ai_stats = dict(current_user.ai_stats or {})
+    for key in ("HUM", "SOC", "NAT", "COL", "PER", "ART", "EXP"):
+        ai_stats[key] = int(ai_stats.get(key, 0)) + int(gained.get(key, 0))
+    current_user.ai_stats = ai_stats  # 새 dict 재할당 → SQLAlchemy가 JSON 변경 감지
+    current_user.exp = int(current_user.exp or 0) + int(gained.get("EXP", 0))
+
     db.commit()
 
-    _logger.info("[StatDebug] 세션 저장 완료 — stat_gained: %s", stat_gained)
+    _logger.info(
+        "[StatDebug] 세션 저장 완료 — stat_gained: %s | user.exp=%d ai_stats=%s",
+        stat_gained, current_user.exp, current_user.ai_stats,
+    )
     return {
         "id": record.id,
         "subject": record.subject,
