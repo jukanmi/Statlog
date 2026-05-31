@@ -105,7 +105,7 @@ def render_portfolio_pdf(
     _section_title(pdf, "능력치 (AI 분석)")
     pdf.kfont(11)
     for key in _STAT_KEYS:
-        val = int(ai_stats.get(key, 0) or 0)
+        val = max(0, min(100, int(ai_stats.get(key, 0) or 0)))
         label = _STAT_LABELS[key]
         pdf.cell(50, 7, f"{label} ({key})", border=0)
         # 간단한 막대 + 수치
