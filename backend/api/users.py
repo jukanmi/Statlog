@@ -120,6 +120,8 @@ async def download_portfolio(
         .order_by(StudySession.date.asc())
         .all()
     )
+    if not sessions:
+        raise HTTPException(status_code=400, detail="포트폴리오를 생성할 학습 기록이 없습니다. 먼저 학습을 기록해주세요.")
     log_text, subject_minutes = _build_portfolio_input(current_user, sessions)
 
     payload = await AIService.request_portfolio_generation(log_text)
