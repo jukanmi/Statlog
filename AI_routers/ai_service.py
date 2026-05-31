@@ -16,6 +16,8 @@ RETRY_INSTRUCTION = PROMPTS["retry_instruction"]
 QUIZ_INSTRUCTION = PROMPTS["quiz_instruction"]
 QUIZ_RETRY_INSTRUCTION = PROMPTS["quiz_retry_instruction"]
 QUIZ_PARTIAL_RETRY_INSTRUCTION = PROMPTS["quiz_partial_retry_instruction"]
+PORTFOLIO_INSTRUCTION = PROMPTS["portfolio_instruction"]
+PORTFOLIO_RETRY_INSTRUCTION = PROMPTS["portfolio_retry_instruction"]
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -86,6 +88,27 @@ class QuizPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     quizzes: list[QuizItemPayload] = Field(min_length=1)
+
+
+class SubjectAnalysis(BaseModel):
+    """포트폴리오의 과목별 분석 한 줄."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    subject: str
+    comment: str
+
+
+class PortfolioPayload(BaseModel):
+    """LLM 포트폴리오 응답 검증용 고정 스키마."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    summary: str
+    strengths: list[str] = Field(default_factory=list)
+    subject_analysis: list[SubjectAnalysis] = Field(default_factory=list)
+    recommended_paths: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
 
 
 # 퀴즈는 이 3가지 깊이를 이 순서로 출제·수집한다.
@@ -159,6 +182,7 @@ class AIService:
         retry_instruction: str,
         model_cls: type[T],
         label: str,
+        timeout: float | None = None,
     ) -> T:
         """GCP AI 서버(LLM)에 요청하고 응답을 고정 스키마로 검증한다.
 
@@ -166,16 +190,18 @@ class AIService:
         - 연동 실패 또는 스키마 위반 시 프롬프트를 보정하여 재요청한다.
         - settings.MAX_RETRIES(최대 2회) 모두 실패하면 콘솔에 에러를 남기고
           HTTPException을 발생시킨다 (프롬프트 점검용).
+        - timeout 미지정 시 settings.TIMEOUT(스탯 변환 기준)을 사용한다.
         """
         payload = {"instruction": base_instruction, "text": log_text}
         last_error: Exception | None = None
         last_body: str | None = None
+        request_timeout = timeout if timeout is not None else settings.TIMEOUT
 
         async with httpx.AsyncClient() as client:
             for attempt in range(settings.MAX_RETRIES):
                 try:
                     response = await client.post(
-                        endpoint, json=payload, timeout=settings.TIMEOUT
+                        endpoint, json=payload, timeout=request_timeout
                     )
                     response.raise_for_status()
                     last_body = response.text
@@ -222,6 +248,16 @@ class AIService:
             settings.GCP_AI_ENDPOINT, log_text,
             ANALYSIS_INSTRUCTION, RETRY_INSTRUCTION,
             LLMStatPayload, "GCP AI",
+        )
+
+    @staticmethod
+    async def request_portfolio_generation(log_text: str) -> PortfolioPayload:
+        """학습 스탯·기록 요약 → 취업용 포트폴리오 생성 (GCP LLM)."""
+        return await AIService._request_llm(
+            settings.GCP_PORTFOLIO_ENDPOINT, log_text,
+            PORTFOLIO_INSTRUCTION, PORTFOLIO_RETRY_INSTRUCTION,
+            PortfolioPayload, "GCP 포트폴리오",
+            timeout=settings.PORTFOLIO_TIMEOUT,
         )
 
     @staticmethod
