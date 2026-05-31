@@ -373,3 +373,32 @@ export async function updateCharacterExpOnServer(payload: CharacterExpRequest): 
     message: "로컬 모킹 API 가상 동기화 성공."
   };
 }
+
+/**
+ * 📄 [API] 프리미엄 구독자용 취업 포트폴리오 PDF 다운로드 요청
+ * 현재는 백엔드 미구현 상태이므로 프론트엔드 단독 테스트용 가상 PDF Blob을 반환합니다.
+ */
+export async function downloadPortfolioPdf(): Promise<Blob> {
+  const token = localStorage.getItem('access_token');
+  
+  /* 🔗 추후 백엔드 API가 완성되면 아래 주석을 해제하여 연동하세요.
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/portfolio/download`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`포트폴리오 PDF 생성 실패 (HTTP ${res.status})`);
+  }
+  return await res.blob(); // PDF 바이너리 데이터를 Blob으로 받아옴
+  */
+
+  // 🧪 [프론트엔드 단독 테스트 지원 가상 네트워크 딜레이 구현]
+  await new Promise((resolve) => setTimeout(resolve, 1500)); // AI가 생성하는 척 1.5초 대기
+  
+  // 임시 가짜 PDF 내용 생성
+  const mockContent = "%PDF-1.4 ... [Mock Portfolio Data] ... \n사용자의 학습 기록 및 능력치 기반 AI 취업 포트폴리오 추출 성공.";
+  return new Blob([mockContent], { type: 'application/pdf' });
+}
