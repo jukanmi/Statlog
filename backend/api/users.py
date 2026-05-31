@@ -100,7 +100,7 @@ def _build_portfolio_input(
             content = (s.content or "").strip().replace("\n", " ")
             if len(content) > 200:
                 content = content[:200] + "…"
-            lines.append(f"- [{s.date}] {s.subject} ({s.duration_minutes}분): {content}")
+            lines.append(f"- [{s.date}] {s.subject} ({s.duration_minutes or 0}분): {content}")
 
     return "\n".join(lines), subject_minutes
 
