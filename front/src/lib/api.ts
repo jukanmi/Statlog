@@ -373,3 +373,23 @@ export async function updateCharacterExpOnServer(payload: CharacterExpRequest): 
     message: "로컬 모킹 API 가상 동기화 성공."
   };
 }
+
+/**
+ * 📄 [API] 학습 능력·스테이터스·기록 기반 취업용 AI 포트폴리오 PDF 다운로드.
+ * 백엔드: GET /api/v1/users/me/portfolio/download → application/pdf Blob
+ */
+export async function downloadPortfolioPdf(): Promise<Blob> {
+  const token = localStorage.getItem('access_token');
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/portfolio/download`, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`포트폴리오 PDF 생성 실패 (HTTP ${res.status})`);
+  }
+  return await res.blob(); // PDF 바이너리 데이터를 Blob으로 받아옴
+}

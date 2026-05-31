@@ -8,7 +8,7 @@ REM ============================================================
 cd /d "%~dp0"
 
 echo [1/2] Starting backend (uvicorn :8000)...
-start "Statlog Backend" cmd /k "python -m uvicorn main:app --host 127.0.0.1 --port 8000"
+start "Statlog Backend" cmd /k "call .venv\Scripts\activate.bat && python -m uvicorn main:app --host 127.0.0.1 --port 8000"
 
 echo [2/2] Starting frontend (vite :8080)...
 start "Statlog Frontend" cmd /k "cd /d "%~dp0front" && npm run dev"

@@ -15,6 +15,7 @@ def _load_prompts() -> dict:
         raw = yaml.safe_load(f)
     schema = raw["llm_json_schema"].strip()
     quiz_schema = raw["quiz_json_schema"].strip()
+    portfolio_schema = raw["portfolio_json_schema"].strip()
     return {
         "llm_json_schema": schema,
         "analysis_instruction": raw["analysis_instruction"].format(schema=schema).strip(),
@@ -27,6 +28,9 @@ def _load_prompts() -> dict:
         "quiz_partial_retry_instruction": raw["quiz_partial_retry_instruction"]
             .format(schema=quiz_schema)
             .strip(),
+        "portfolio_json_schema": portfolio_schema,
+        "portfolio_instruction": raw["portfolio_instruction"].format(schema=portfolio_schema).strip(),
+        "portfolio_retry_instruction": raw["portfolio_retry_instruction"].format(schema=portfolio_schema).strip(),
     }
 
 
@@ -45,6 +49,13 @@ class Settings:
     TIMEOUT: float = 30.0  # 스탯 변환 요청 타임아웃(초)
     # 퀴즈 생성은 문항 3개를 만들어 스탯 변환보다 오래 걸린다 — 별도 타임아웃
     QUIZ_TIMEOUT: float = float(os.getenv("QUIZ_TIMEOUT", "90"))
+    # 포트폴리오 생성 엔드포인트 — 기본값은 GCP_AI_ENDPOINT와 같은 호스트의 /generate_portfolio
+    GCP_PORTFOLIO_ENDPOINT: str = os.getenv(
+        "GCP_PORTFOLIO_ENDPOINT",
+        GCP_AI_ENDPOINT.rsplit("/", 1)[0] + "/generate_portfolio",
+    )
+    # 포트폴리오는 여러 섹션의 문단형 텍스트를 생성해 오래 걸린다 — 별도 타임아웃
+    PORTFOLIO_TIMEOUT: float = float(os.getenv("PORTFOLIO_TIMEOUT", "90"))
     # 스탯 1포인트당 부여할 경험치 (EXP 계산에 사용)
     EXP_PER_STAT_POINT: int = int(os.getenv("EXP_PER_STAT_POINT", "10"))
     # 학습 깊이(암기/이해/응용)에 따른 EXP 가중치
