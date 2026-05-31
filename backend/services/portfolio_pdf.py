@@ -14,7 +14,7 @@ from AI_routers.ai_service import PortfolioPayload
 logger = logging.getLogger("services.portfolio_pdf")
 
 # 한글 폰트 경로 — Windows 기본 맑은 고딕. 운영 배포 시 env로 교체하거나 폰트 번들 필요.
-_FONT_PATH = os.getenv("PORTFOLIO_FONT_PATH", "C:/Windows/Fonts/malgun.ttf")
+_FONT_PATH = os.getenv("PORTFOLIO_FONT_PATH", "assets/fonts/malgun.ttf")
 _FONT_NAME = "Malgun"
 
 # 6대 능력치 라벨 (ai_log.py / 프론트와 동일 체계).
