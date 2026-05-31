@@ -63,10 +63,17 @@ export interface Quiz {
   question: string;
   options: string[];
   correctIndex: number;
+  // 정답이 '왜 정답인지'만 설명하는 해설 (백엔드 LLM 생성)
+  explanation?: string;
 }
 
 interface QuizApiResponse {
-  quizzes: { question: string; options: string[]; correct_index: number }[];
+  quizzes: {
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation?: string;
+  }[];
 }
 
 /**
@@ -89,6 +96,7 @@ export async function generateQuiz(content: string): Promise<Quiz[]> {
     question: q.question,
     options: q.options,
     correctIndex: q.correct_index,
+    explanation: q.explanation,
   }));
 }
 

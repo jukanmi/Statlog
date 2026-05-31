@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(rtk tsc:*)",
-      "Bash(where gh:*)"
-    ]
-  }
-}

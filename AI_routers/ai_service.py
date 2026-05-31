@@ -67,6 +67,8 @@ class QuizItemPayload(BaseModel):
     question: str
     options: list[str]
     correct_index: int
+    # 정답이 '왜 정답인지'만 설명하는 해설. LLM이 빠뜨려도 검증은 통과시킨다.
+    explanation: str | None = None
     depth: LearningDepth | None = None
 
     @model_validator(mode="after")

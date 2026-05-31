@@ -18,13 +18,6 @@ export interface AIStats {
   EXP: number;
 }
 
-export interface AIQuizItem {
-  question: string;
-  choices: string[];
-  correctIndex: number;
-  explanation: string;
-}
-
 export interface User {
   id: string;
   nickname: string;

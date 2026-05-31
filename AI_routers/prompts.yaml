@@ -68,8 +68,9 @@ retry_instruction: |-
 # 퀴즈 생성 LLM이 지켜야 하는 고정 JSON 스키마
 # - depth는 해당 문항의 학습 깊이 분류: "memorize" | "understand" | "apply"
 # - 누락된 깊이만 재요청할 수 있도록 각 문항이 자신의 depth를 명시해야 한다.
+# - explanation은 correct_index가 가리키는 정답이 '왜 정답인지'만 설명한다.
 quiz_json_schema: >-
-  {"quizzes": [{"depth": "memorize"|"understand"|"apply", "question": <string>, "options": [<string>, <string>, <string>, <string>], "correct_index": <0-3>}]}
+  {"quizzes": [{"depth": "memorize"|"understand"|"apply", "question": <string>, "options": [<string>, <string>, <string>, <string>], "correct_index": <0-3>, "explanation": <string>}]}
 
 # 학습 내용 기반 퀴즈 생성 지시문
 # - 문제는 정확히 3개, 순서가 의미를 가진다:
@@ -92,6 +93,9 @@ quiz_instruction: |-
   - 각 문제는 학습 내용에서 근거를 찾을 수 있어야 합니다.
   - 각 문제의 보기(options)는 정확히 4개입니다.
   - correct_index는 정답 보기의 인덱스(0~3 정수)입니다.
+  - explanation은 correct_index가 가리키는 정답이 '왜 정답인지'만 설명합니다.
+    오답 보기가 틀린 이유는 쓰지 말고, 정답의 근거를 학습 내용에 기반해
+    1~2문장의 한국어로 간결하게 작성하세요.
   - 문제와 보기는 모두 한국어로 작성하세요.
   - 각 문제는 자신의 분류를 depth 필드에 명시하세요:
     1번은 "memorize", 2번은 "understand", 3번은 "apply".
@@ -113,6 +117,7 @@ quiz_partial_retry_instruction: |-
   - 분류별 출제 기준은 처음 지시와 동일합니다.
     (암기=용어·사실 직접 묻기, 이해=원리·인과 해석, 응용=새 사례 적용·변형)
   - 각 문제의 보기(options)는 정확히 4개, correct_index는 0~3 정수입니다.
+  - explanation은 정답이 '왜 정답인지'만 1~2문장의 한국어로 작성하세요.
   - 각 문제의 depth 필드에는 해당 분류 키("memorize"/"understand"/"apply")를 그대로 적으세요.
   - 다른 분류의 문항은 절대 포함하지 마세요.
 
@@ -124,5 +129,6 @@ quiz_retry_instruction: |-
   순서는 1번 암기(memorize), 2번 이해(understand), 3번 응용(apply)이며,
   각 문제의 depth 필드에 해당 분류를 그대로 적으세요.
   각 문제는 보기 4개, correct_index는 0~3 정수입니다. 모두 한국어로 작성하세요.
+  explanation에는 정답이 '왜 정답인지'만 1~2문장으로 적으세요.
   [재요청] 이전 응답이 JSON 스키마를 위반했습니다.
   반드시 {schema} 형식의 JSON만, 다른 텍스트 없이 출력하세요.
