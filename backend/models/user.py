@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, JSON
+from sqlalchemy import Column, String, DateTime, Date, Integer, Boolean
 from sqlalchemy.sql import func
 
 from core.db import Base
@@ -15,10 +15,8 @@ class User(Base):
     level = Column(Integer, nullable=False, default=1)
     exp = Column(Integer, nullable=False, default=0)
     study_streak = Column(Integer, nullable=False, default=0)
-    last_attendance_date = Column(String(10), nullable=True)
-    stats = Column(JSON, nullable=True)             # {"HUM":0,"SOC":0,"NAT":0,"COL":0,"PER":0,"ART":0}
-    ai_stats = Column(JSON, nullable=True)          # {"HUM":0,...,"EXP":0}
-    owned_characters_bits = Column(Integer, nullable=False, default=7)  # char_1~12 비트마스크 (기본: char_1|2|3)
-    equipped_character_id = Column(String(50), nullable=True, default="char_1")
-    character_exp_map = Column(JSON, nullable=True)  # {"char_1": 40, ...}
+    last_attendance_date = Column(Date, nullable=True)
+    data_collection_consent = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 캐릭터 보유/장착/성장 → user_characters 테이블로 일원화 (models/user_character.py)
+    # 스탯 → user_stats / user_ai_stats 테이블로 일원화 (models/user_stats.py)

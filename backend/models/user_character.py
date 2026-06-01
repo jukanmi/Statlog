@@ -7,7 +7,7 @@ class UserCharacter(Base):
     __tablename__ = "user_characters"
 
     id = Column(String(36), primary_key=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    character_id = Column(String(50), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    character_id = Column(String(50), ForeignKey("characters.id", ondelete="CASCADE"), nullable=False)
     char_exp = Column(Integer, nullable=False, default=0)
     is_equipped = Column(Boolean, nullable=False, default=False)

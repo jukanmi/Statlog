@@ -6,9 +6,21 @@ from core.db import get_db
 from core.security import decode_access_token
 from schemas.user import UserUpdateRequest, serialize_user
 from models.user import User
+from models.user_stats import UserStat, UserAiStat
 from models.study_session import StudySession
 from AI_routers.ai_service import AIService
 from services.portfolio_pdf import render_portfolio_pdf
+
+_STAT_KEYS = ("HUM", "SOC", "NAT", "COL", "PER", "ART")
+
+
+def _load_stat_map(db: Session, user_id: str) -> dict[str, int]:
+    """포트폴리오용 6대 능력치 맵. user_ai_stats 우선, 없으면 user_stats, 둘 다 없으면 0."""
+    row = (
+        db.query(UserAiStat).filter_by(user_id=user_id).first()
+        or db.query(UserStat).filter_by(user_id=user_id).first()
+    )
+    return {k: int(getattr(row, k, 0) or 0) for k in _STAT_KEYS} if row else {k: 0 for k in _STAT_KEYS}
 
 # 포트폴리오 LLM 입력에 포함할 최근 학습 기록 개수.
 _PORTFOLIO_RECENT_SESSIONS = 15
@@ -67,13 +79,12 @@ async def update_me(
 
 
 def _build_portfolio_input(
-    user: User, sessions: list[StudySession]
+    user: User, sessions: list[StudySession], stats: dict[str, int]
 ) -> tuple[str, dict[str, int]]:
     """유저 스탯·학습 기록을 LLM 입력용 한국어 텍스트로 조립한다.
 
     반환: (log_text, 과목별 총 학습시간(분) 맵).
     """
-    stats = user.ai_stats or user.stats or {}
     subject_minutes: dict[str, int] = {}
     for s in sessions:
         subject_minutes[s.subject] = subject_minutes.get(s.subject, 0) + (s.duration_minutes or 0)
@@ -122,7 +133,8 @@ async def download_portfolio(
     )
     if not sessions:
         raise HTTPException(status_code=400, detail="포트폴리오를 생성할 학습 기록이 없습니다. 먼저 학습을 기록해주세요.")
-    log_text, subject_minutes = _build_portfolio_input(current_user, sessions)
+    stat_map = _load_stat_map(db, current_user.id)
+    log_text, subject_minutes = _build_portfolio_input(current_user, sessions, stat_map)
 
     payload = await AIService.request_portfolio_generation(log_text)
 
@@ -131,7 +143,7 @@ async def download_portfolio(
         nickname=current_user.nickname,
         level=int(current_user.level or 1),
         exp=int(current_user.exp or 0),
-        ai_stats=current_user.ai_stats or current_user.stats or {},
+        ai_stats=stat_map,
         subject_minutes=subject_minutes,
     )
 
