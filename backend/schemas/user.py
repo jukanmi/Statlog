@@ -1,7 +1,6 @@
-from datetime import datetime
-from typing import Any
+from datetime import datetime, date
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserResponse(BaseModel):
@@ -16,13 +15,9 @@ class UserResponse(BaseModel):
     level: int = 1
     exp: int = 0
     study_streak: int = 0
-    last_attendance_date: str | None = None
-    stats: dict[str, Any] | None = None
-    ai_stats: dict[str, Any] | None = None
-    owned_characters_bits: int = 7
-    equipped_character_id: str | None = None
-    character_exp_map: dict[str, Any] | None = None
+    last_attendance_date: date | None = None
     created_at: datetime | None = None
+    # 스탯 → user_stats / user_ai_stats, 캐릭터 → user_characters (별도 조회)
 
 
 class UserUpdateRequest(BaseModel):
@@ -33,23 +28,25 @@ class UserUpdateRequest(BaseModel):
     level: int | None = Field(default=None, ge=1)
     exp: int | None = Field(default=None, ge=0)
     study_streak: int | None = Field(default=None, ge=0)
-    last_attendance_date: str | None = None
-    stats: dict[str, Any] | None = None
-    ai_stats: dict[str, Any] | None = None
-    owned_characters_bits: int | None = Field(default=None, ge=0)
-    equipped_character_id: str | None = None
-    character_exp_map: dict[str, Any] | None = None
+    last_attendance_date: date | None = None
 
-    @field_validator("stats", "ai_stats", "character_exp_map")
-    @classmethod
-    def _non_negative_number_values(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
-        """스탯/캐릭터 EXP 맵의 값은 0 이상의 숫자만 허용한다 (음수·문자열 등 비정상 값 거부)."""
-        if v is None:
-            return v
-        for key, val in v.items():
-            if isinstance(val, bool) or not isinstance(val, (int, float)) or val < 0:
-                raise ValueError(f"{key} 값은 0 이상의 숫자여야 합니다")
-        return v
+
+class StatBlock(BaseModel):
+    HUM: int = 0
+    SOC: int = 0
+    NAT: int = 0
+    COL: int = 0
+    PER: int = 0
+    ART: int = 0
+
+
+class AiStatBlock(StatBlock):
+    EXP: int = 0
+
+
+class UserStatsResponse(BaseModel):
+    stats: StatBlock
+    ai_stats: AiStatBlock
 
 
 class CharacterUpsertRequest(BaseModel):

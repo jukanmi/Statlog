@@ -8,7 +8,7 @@ class UserQuiz(Base):
     __tablename__ = "user_quizzes"
 
     id = Column(String(50), primary_key=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String(50), nullable=False)
     type = Column(String(10), nullable=False)        # 'multiple' | 'short'
     question = Column(String(500), nullable=False)

@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
 import uuid
+from datetime import date
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -24,7 +25,15 @@ import models.oauth_account
 import models.refresh_token
 import models.study_session
 import models.user_quiz
+import models.character
+import models.user_stats
+import models.guild
+import models.daily_quest
+import models.party
+import models.avatar
+import models.user_character
 from models.study_session import StudySession
+from models.user_stats import UserAiStat
 
 
 @asynccontextmanager
@@ -93,7 +102,7 @@ async def get_study_sessions(
             "subject": s.subject,
             "content": s.content,
             "duration_minutes": s.duration_minutes,
-            "date": s.date,
+            "date": s.date.isoformat() if s.date else None,
         }
         for s in sessions
     ]
@@ -116,30 +125,35 @@ async def save_study_session(
         _logger.error("[StatDebug] analyze_log_to_stats 실패: %s: %s", type(e).__name__, e)
         stat_gained = StatResponse()
 
+    gained = stat_gained.model_dump()
+
     record = StudySession(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
         subject=session.subject,
         content=session.content,
         duration_minutes=session.duration_minutes,
-        date=session.date,
+        date=date.fromisoformat(session.date),
+        stat_gained=gained,
+        quiz_results=session.quiz_results,
     )
     db.add(record)
 
-    # 획득 스탯을 서버가 직접 user에 누적·영속화한다 (진실의 원천 = 서버).
-    # ai_stats: 6대 능력치 + EXP 맵, exp: 별도 정수 컬럼.
-    gained = stat_gained.model_dump()
-    ai_stats = dict(current_user.ai_stats or {})
+    # 획득 스탯을 서버가 직접 누적·영속화한다 (진실의 원천 = 서버).
+    # AI 스탯은 user_ai_stats 테이블에, 유저 레벨용 exp는 users.exp 컬럼에 누적.
+    ai_stat = db.query(UserAiStat).filter_by(user_id=current_user.id).first()
+    if ai_stat is None:
+        ai_stat = UserAiStat(user_id=current_user.id)
+        db.add(ai_stat)
     for key in ("HUM", "SOC", "NAT", "COL", "PER", "ART", "EXP"):
-        ai_stats[key] = int(ai_stats.get(key, 0)) + int(gained.get(key, 0))
-    current_user.ai_stats = ai_stats  # 새 dict 재할당 → SQLAlchemy가 JSON 변경 감지
+        setattr(ai_stat, key, int(getattr(ai_stat, key) or 0) + int(gained.get(key, 0)))
     current_user.exp = int(current_user.exp or 0) + int(gained.get("EXP", 0))
 
     db.commit()
 
     _logger.info(
-        "[StatDebug] 세션 저장 완료 — stat_gained: %s | user.exp=%d ai_stats=%s",
-        stat_gained, current_user.exp, current_user.ai_stats,
+        "[StatDebug] 세션 저장 완료 — stat_gained: %s | user.exp=%d ai_stat.EXP=%d",
+        stat_gained, current_user.exp, ai_stat.EXP,
     )
     return {
         "id": record.id,

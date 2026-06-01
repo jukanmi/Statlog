@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Enum, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, Enum, ForeignKey, Integer, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -23,6 +23,9 @@ class Party(Base):
     __tablename__ = "parties"
     id = Column(String(36), primary_key=True)
     name = Column(String, nullable=False)
+    description = Column(String(1000), nullable=True)
+    tags = Column(JSON, nullable=True)               # ["수능","고3",...]
+    weekly_minutes = Column(Integer, nullable=False, default=0)
     leader_user_id = Column(String(36), ForeignKey("users.id"))
     max_member_count = Column(Integer, default=6)
     status = Column(Enum(PartyStatus), default=PartyStatus.RECRUITING)
@@ -35,7 +38,7 @@ class PartyMember(Base):
     __tablename__ = "party_members"
     party_id = Column(String(36), ForeignKey("parties.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    role = Column(Enum(PartyRole), default=PartyRole.MEMBER)
+    role = Column(Enum(PartyRole, length=20), default=PartyRole.MEMBER)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
     party = relationship("Party", back_populates="members")
