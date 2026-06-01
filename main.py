@@ -57,6 +57,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "http://localhost:8080",  # Vite 개발 서버 (vite.config.ts의 server.port)
 	"http://54.180.155.190:8080",

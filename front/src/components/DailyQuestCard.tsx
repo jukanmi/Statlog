@@ -1,6 +1,7 @@
 // TAGS: UI, Component, Daily, Quest, Progress, Extensible
 import React from 'react';
 import { Pencil } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface DailyQuestProps {
   questId: string;
@@ -30,60 +31,47 @@ const DailyQuestCard: React.FC<DailyQuestProps> = ({
 
   return (
     <div
-      style={{
-        backgroundColor: '#1C1C28',
-        borderRadius: 16,
-        padding: 16,
-        width: '100%',
-        maxWidth: 400,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-        marginBottom: 24,
-        position: 'relative',
-        overflow: 'hidden',
-        border: isClaimed ? '1px solid rgba(255,255,255,0.1)' : isCompleted ? '1px solid #C9A84C' : '1px solid transparent',
-      }}
+      className={cn(
+        "bg-card rounded-2xl p-4 w-full max-w-[400px] shadow-lg mb-6 relative overflow-hidden transition-all duration-300",
+        isClaimed 
+          ? "border border-border" 
+          : isCompleted 
+            ? "border border-[#C9A84C] shadow-[#C9A84C]/10 shadow-xl" 
+            : "border border-transparent"
+      )}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+      <div className="flex justify-between items-start mb-3">
         <div>
-          <h3 style={{ margin: 0, color: '#FFFFFF', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <h3 className="m-0 text-foreground text-base font-bold flex items-center gap-1.5">
             {title}
             {onEditTarget && (
               <button
                 onClick={onEditTarget}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'rgba(255,255,255,0.4)',
-                }}
+                className="bg-none border-none cursor-pointer p-1 flex items-center text-foreground/40 hover:text-foreground/60 transition-colors"
               >
                 <Pencil size={14} />
               </button>
             )}
           </h3>
-          <p style={{ margin: 0, color: '#A0A0AB', fontSize: 12, marginTop: 4 }}>{description}</p>
+          <p className="m-0 text-foreground/50 text-xs mt-1">{description}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 12, fontWeight: 600 }}>
-          {reward.gold > 0 && <span style={{ color: '#C9A84C' }}>+{reward.gold}G</span>}
-          {reward.gems > 0 && <span style={{ color: '#A78BFA' }}>+{reward.gems}젬</span>}
+        <div className="flex gap-2 text-xs font-semibold">
+          {reward.gold > 0 && <span className="text-[#C9A84C]">+{reward.gold}G</span>}
+          {reward.gems > 0 && <span className="text-[#A78BFA]">+{reward.gems}젬</span>}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1, height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 bg-foreground/10 rounded-full overflow-hidden">
           <div
-            style={{
-              height: '100%',
-              backgroundColor: isClaimed ? '#4ADE80' : '#A78BFA',
-              width: `${progressRatio * 100}%`,
-              transition: 'width 0.3s ease',
-            }}
+            className={cn(
+              "h-full transition-all duration-500 ease-out",
+              isClaimed ? "bg-[#4ADE80]" : "bg-[#A78BFA]"
+            )}
+            style={{ width: `${progressRatio * 100}%` }}
           />
         </div>
-        <span style={{ fontSize: 12, color: '#FFFFFF', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>
+        <span className="text-xs text-foreground font-semibold min-w-[40px] text-right">
           {currentProgress} / {targetProgress}
         </span>
       </div>
@@ -91,18 +79,14 @@ const DailyQuestCard: React.FC<DailyQuestProps> = ({
       <button
         disabled={!isCompleted || isClaimed}
         onClick={() => onClaim(questId, reward)}
-        style={{
-          marginTop: 16,
-          width: '100%',
-          padding: '10px 0',
-          borderRadius: 8,
-          border: 'none',
-          backgroundColor: isClaimed ? 'rgba(255,255,255,0.1)' : isCompleted ? '#C9A84C' : 'rgba(255,255,255,0.05)',
-          color: isClaimed ? '#A0A0AB' : isCompleted ? '#13131A' : '#A0A0AB',
-          fontWeight: 700,
-          cursor: (!isCompleted || isClaimed) ? 'not-allowed' : 'pointer',
-          transition: 'all 0.2s',
-        }}
+        className={cn(
+          "mt-4 w-full py-2.5 rounded-lg border-none font-bold transition-all active:scale-[0.98]",
+          isClaimed 
+            ? "bg-foreground/10 text-foreground/40 cursor-not-allowed" 
+            : isCompleted 
+              ? "bg-[#C9A84C] text-background cursor-pointer hover:brightness-110 shadow-lg shadow-[#C9A84C]/20" 
+              : "bg-foreground/5 text-foreground/40 cursor-not-allowed"
+        )}
       >
         {isClaimed ? '보상 받기 완료' : isCompleted ? '보상 받기' : '진행 중'}
       </button>

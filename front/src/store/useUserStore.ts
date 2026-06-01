@@ -1,20 +1,40 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, Stats } from '@/types';
-import { EVOLUTION_CHAIN, ALL_CHARACTERS } from '@/lib/gachaSystem';
-import { updateCharacterExpOnServer, syncUserToServer, encodeBitmask } from '@/lib/api';
+import type { User, Stats, AIStats } from '@/types';
+import { calcExpMultiplier, calcExpGain, calcEvolutionStage, calcLevel, getDisplayCharacterId } from '@/lib/characterLevel';
+import { ALL_CHARACTERS } from '@/constants/characters';
+import { syncUserToServer, encodeBitmask } from '@/lib/api';
+import { CharacterService } from '@/services/characterService';
 
 export interface AttendanceReward {
   gold: number;
   gems: number;
 }
 
+export interface Potion {
+  type: 'small' | 'large';
+  multiplier: 1.5 | 2.0;
+}
+
+export interface ExpGainResult {
+  expGained: number;
+  didEvolve: boolean;
+  evolutionStage: 0 | 1 | 2;
+  toast: string | null;
+}
+
 interface UserState {
   user: User;
   ownedCharacterIds: string[];
-  equippedCharacterId: string | null;              // 🎴 현재 장착 중인 대표 캐릭터 고유 ID
-  characterExpMap: Record<string, number>;         // 📊 캐릭터별 개별 EXP 누적 테이블 (Key: ID, Value: EXP)
-  lastAttendanceDate: string | null;  // 'YYYY-MM-DD'
+  equippedCharacterId: string | null;
+  characterExpMap: Record<string, number>;
+  potionQueue: Potion[];
+  lastAttendanceDate: string | null;
+  isAuthenticated: boolean;
+  theme: 'light' | 'dark';
+  login: () => void;
+  logout: () => void;
+  toggleTheme: () => void;
   updateStats: (stats: Partial<Stats>) => void;
   updateAIStats: (stats: Partial<AIStats>) => void;
   updateProfileImage: (imageUrl: string | null) => void;
@@ -27,18 +47,26 @@ interface UserState {
   claimAttendance: () => AttendanceReward;
   dataCollectionConsent: boolean | null;
   setConsent: (consent: boolean) => void;
-  equipCharacter: (id: string) => void;            // 🎴 캐릭터 교체 함수
-  gainEquippedCharacterExp: (amount: number) => Promise<{ evolved: boolean; toast: string | null }>; // 🚀 경험치 축적 & 진화 엔진
+  equipCharacter: (id: string) => void;
+  gainEquippedCharacterExp: (durationMin: number, subjectMatch: boolean, quizRatio: number) => ExpGainResult;
+  buyPotion: (type: 'small' | 'large') => boolean;
+  gainExpFromStudy: (seconds: number) => Promise<{ evolved: boolean; toast: string | null }>;
 }
 
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
-      ownedCharacterIds: ['char_1', 'char_2', 'char_3'], // 초기 더미 진화용 기본 캐릭터 지급
-      equippedCharacterId: 'char_1',                    // 앱 구동 시 공부엉이 자동 장착
+      ownedCharacterIds: ['char_1', 'char_2', 'char_3'],
+      equippedCharacterId: 'char_1',
       characterExpMap: {},
+      potionQueue: [],
       lastAttendanceDate: null,
       dataCollectionConsent: null,
+      isAuthenticated: false,
+      theme: 'dark',
+      login: () => set({ isAuthenticated: true }),
+      logout: () => set({ isAuthenticated: false }),
+      toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       user: {
         id: 'user-001',
         nickname: '탐험가',
@@ -121,87 +149,112 @@ export const useUserStore = create<UserState>()(
         return reward;
       },
       setConsent: (consent) => set({ dataCollectionConsent: consent }),
-      
-      // 캐릭터 장착 변경 액션 처리
-      equipCharacter: (id) => set({ equippedCharacterId: id }),
 
-      // 경험치 가산 및 실시간 진화 판독 처리 액션 코드
-      gainEquippedCharacterExp: async (amount) => {
-        const initialEquippedId = get().equippedCharacterId;
-        if (!initialEquippedId) return { evolved: false, toast: null };
+      equipCharacter: (id) => {
+        set({ equippedCharacterId: id });
+        const { ownedCharacterIds, characterExpMap } = get();
+        syncUserToServer({
+          equipped_character_id: id,
+          owned_characters_bits: encodeBitmask(ownedCharacterIds),
+          character_exp_map: characterExpMap,
+        });
+      },
 
-        // 📡 백엔드 연동용 API 비동기 정산 요청 호출
-        try {  
-          await updateCharacterExpOnServer({ characterId: initialEquippedId, expGained: amount });  
-        } catch (error) {  
-          console.error("Failed to sync character exp with server:", error);
-          // 필요 시 여기서 return 하여 로컬 정산을 차단할 수 있습니다.
+      gainEquippedCharacterExp: (durationMin, subjectMatch, quizRatio) => {
+        if (durationMin <= 0) return { expGained: 0, didEvolve: false, evolutionStage: 0, toast: null };
+        const state = get();
+        const equippedId = state.equippedCharacterId;
+        if (!equippedId) return { expGained: 0, didEvolve: false, evolutionStage: 0, toast: null };
+
+        const potion = state.potionQueue[0] ?? null;
+        const potionMultiplier = potion ? potion.multiplier : 1.0;
+        const newQueue = potion ? state.potionQueue.slice(1) : state.potionQueue;
+
+        const multiplier = calcExpMultiplier({ subjectMatch, quizCorrectRatio: quizRatio, potionMultiplier });
+        const expGained = calcExpGain(durationMin, multiplier);
+
+        const prevExp = state.characterExpMap[equippedId] ?? 0;
+        const newExp = prevExp + expGained;
+
+        const prevStage = calcEvolutionStage(calcLevel(prevExp));
+        const newStage = calcEvolutionStage(calcLevel(newExp));
+        const didEvolve = newStage > prevStage;
+
+        const newMap = { ...state.characterExpMap, [equippedId]: newExp };
+        set({ characterExpMap: newMap, potionQueue: newQueue });
+
+        syncUserToServer({ character_exp_map: newMap });
+
+        let toast: string | null = null;
+        if (didEvolve) {
+          const displayId = getDisplayCharacterId(equippedId, calcLevel(newExp));
+          const evolved = ALL_CHARACTERS.find((c) => c.id === displayId);
+          toast = evolved ? `✨ ${evolved.name}(으)로 진화했습니다!` : '✨ 캐릭터가 진화했습니다!';
         }
 
-        // 비동기 작업 이후 최신 상태를 다시 조회 (Race Condition 방지)
-        const { characterExpMap, ownedCharacterIds, equippedCharacterId } = get();
+        return { expGained, didEvolve, evolutionStage: newStage, toast };
+      },
 
-        const currentExp = (characterExpMap[initialEquippedId] || 0) + amount;
-        const nextEvolutionId = EVOLUTION_CHAIN[initialEquippedId];
+      buyPotion: (type) => {
+        const state = get();
+        const cost = type === 'small' ? { gold: 200, gems: 0 } : { gold: 0, gems: 1 };
+        if (state.user.gold < cost.gold || state.user.gems < cost.gems) return false;
 
-        // 🎯 경험치 커트라인 100점 돌파 및 진화체가 지정되어 있을 때
-        // (!ownedCharacterIds.includes 조건 제거 -> 가챠로 뽑았어도 진화 가능해야 함)
-        if (currentExp >= 100 && nextEvolutionId) {
-          const evolvedCharacter = ALL_CHARACTERS.find(c => c.id === nextEvolutionId);
-          
-          // 초과 경험치 계산 및 맵 업데이트
-          const leftoverExp = currentExp - 100;
-          const updatedExpMap = { 
-            ...characterExpMap, 
-            [initialEquippedId]: 0, 
-            [nextEvolutionId]: (characterExpMap[nextEvolutionId] || 0) + leftoverExp 
-          };
-          
-          // 소유 리스트 업데이트 (중복 방지 처리)
-          const updatedOwnedIds = Array.from(new Set([...ownedCharacterIds, nextEvolutionId]));
+        const potion: Potion = { type, multiplier: type === 'small' ? 1.5 : 2.0 };
+        const newQueue = [...state.potionQueue, potion];
+        const newUser = {
+          ...state.user,
+          gold: state.user.gold - cost.gold,
+          gems: state.user.gems - cost.gems,
+        };
+        set({ user: newUser, potionQueue: newQueue });
+        syncUserToServer({ gold: newUser.gold, gems: newUser.gems });
+        return true;
+      },
 
-          // 비동기 작업 동안 유저가 대표 캐릭터를 수동으로 바꾸지 않은 경우에만 자동 장착
-          const shouldUpdateEquipped = equippedCharacterId === initialEquippedId;
+      gainExpFromStudy: async (seconds) => {
+        const { equippedCharacterId, characterExpMap } = get();
+        if (!equippedCharacterId) return { evolved: false, toast: null };
 
-          const newEquippedId = shouldUpdateEquipped ? nextEvolutionId : equippedCharacterId;
-          set({
-            characterExpMap: updatedExpMap,
-            ownedCharacterIds: updatedOwnedIds,
-            ...(shouldUpdateEquipped ? { equippedCharacterId: nextEvolutionId } : {})
-          });
+        const expAmount = CharacterService.calculateExpFromSeconds(seconds);
+        if (expAmount === 0) return { evolved: false, toast: null };
 
-          syncUserToServer({
-            owned_characters_bits: encodeBitmask(updatedOwnedIds),
-            equipped_character_id: newEquippedId ?? undefined,
-            character_exp_map: updatedExpMap,
-          });
+        const result = await CharacterService.processExpGain(
+          equippedCharacterId,
+          expAmount,
+          characterExpMap
+        );
 
-          return {
-            evolved: true,
-            toast: `🧬 [진화 성공] 캐릭터 경험치가 임계치를 돌파하여 대진화를 이뤄냈습니다! 새로운 진화 형태인 [${evolvedCharacter?.name}]을(를) 확인하세요!`
-          };
-        } else {
-          // 일반적인 경험치 단순 축적 스택
-          set({
-            characterExpMap: {
-              ...characterExpMap,
-              [initialEquippedId]: Math.min(100, currentExp)
-            }
-          });
-          return { evolved: false, toast: `✨ 착용 중인 캐릭터가 보상 EXP +${amount}를 획득했습니다. (${Math.min(100, currentExp)}/100)` };
-        }
+        set((state) => ({
+          characterExpMap: result.updatedExpMap,
+          ownedCharacterIds: result.evolved && result.newCharacterId
+            ? Array.from(new Set([...state.ownedCharacterIds, result.newCharacterId]))
+            : state.ownedCharacterIds,
+          equippedCharacterId: result.evolved && result.newCharacterId && state.equippedCharacterId === equippedCharacterId
+            ? result.newCharacterId
+            : state.equippedCharacterId
+        }));
+
+        return { evolved: result.evolved, toast: result.toast };
       },
     }),
     {
       name: 'user-store',
-      version: 1,
-      migrate: (persisted, version) => {
-        const state = persisted as { user?: User } | undefined;
+      version: 2,
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as Partial<UserState> | undefined;
         if (state?.user && version < 1) {
           state.user = {
             ...state.user,
             stats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0 },
           };
+        }
+        if (version < 2) {
+          if (!state) return state as UserState;
+          if (!(state as any).theme) (state as any).theme = 'dark';
+          if (!(state as any).potionQueue) (state as any).potionQueue = [];
+          if (!state.characterExpMap) state.characterExpMap = {};
+          if (state.equippedCharacterId === undefined) state.equippedCharacterId = 'char_1';
         }
         return state as UserState;
       },

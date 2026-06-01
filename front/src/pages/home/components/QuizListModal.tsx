@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuizStore, OFFICIAL_UPVOTE_THRESHOLD } from '@/store/useQuizStore';
 import type { UserQuiz } from '@/types';
 import { deleteQuizFromServer, voteQuizOnServer, reportQuizOnServer } from '@/lib/api';
+import QuizReportModal from './QuizReportModal';
 
 const SUBJECT_COLORS: Record<string, string> = {
   수학: '#4ADE80',
@@ -39,6 +40,8 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportingQuizId, setReportingQuizId] = useState<string | null>(null);
 
   const {
     userQuizzes,
@@ -97,14 +100,24 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
       showToast('이미 신고한 퀴즈예요');
       return;
     }
-    reportQuiz(quiz.id);
-    reportQuizOnServer(quiz.id);
-    const newCount = (reportCounts[quiz.id] ?? 0) + 1;
+    setReportingQuizId(quiz.id);
+    setReportModalOpen(true);
+  };
+
+  const confirmReport = (reason: string) => {
+    if (!reportingQuizId) return;
+
+    console.log('Quiz reported (List):', { quizId: reportingQuizId, reason });
+    reportQuiz(reportingQuizId);
+    reportQuizOnServer(reportingQuizId);
+
+    const newCount = (reportCounts[reportingQuizId] ?? 0) + 1;
     if (newCount >= 3) {
       showToast('신고가 접수됐어요. 문제가 숨겨졌어요');
     } else {
       showToast('신고가 접수됐어요');
     }
+    setReportingQuizId(null);
   };
 
   return (
@@ -338,6 +351,15 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
       {toastMsg && <Toast msg={toastMsg} />}
+
+      <QuizReportModal
+        isOpen={reportModalOpen}
+        onClose={() => {
+          setReportModalOpen(false);
+          setReportingQuizId(null);
+        }}
+        onSubmit={confirmReport}
+      />
     </>
   );
 };

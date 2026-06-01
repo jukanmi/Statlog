@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
 import AuthCallback from './pages/auth/AuthCallback';
-import BottomTabBar, { type Tab } from './components/BottomTabBar';
+import MainLayout from './components/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
 import PlaceholderPage from './components/PlaceholderPage';
 import HomePage from './pages/home/HomePage';
 import PokedexPage from './pages/pokedex/PokedexPage';
@@ -17,24 +18,55 @@ import { useQuizStore } from './store/useQuizStore';
 import { useSocialStore } from './store/useSocialStore';
 import { getUserProfile, decodeBitmask, fetchStudySessions, fetchUserQuizzes } from './lib/api';
 
-const tabLabels: Record<Tab, string> = {
-  home: '홈',
-  pokedex: '도감',
-  party: '파티',
-  dashboard: '대시보드',
-};
-
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, login, logout, lastAttendanceDate, theme } = useUserStore();
   const [isInitializing, setIsInitializing] = useState(true);
   const [showAttendance, setShowAttendance] = useState(false);
-  const lastAttendanceDate = useUserStore((s) => s.lastAttendanceDate);
   const checkDayReset = useStudyStore((s) => s.checkDayReset);
   const navigate = useNavigate();
 
   useEffect(() => {
     checkDayReset();
-  }, []);
+  }, [checkDayReset]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+  }, [theme]);
+
+  // 👥 [딥링크 차단 복구] 인증 상태가 완료(True)되는 즉시 주소창 파라미터를 파싱하여 파티 결합 통제
+  useEffect(() => {
+    if (isAuthenticated) {
+      const params = new URLSearchParams(window.location.search);
+      const inviteCode = params.get('invite_code');
+      const joinId = params.get('join');
+
+      if (inviteCode || joinId) {
+        // 처리 후 루프 방지를 위해 주소창 청소 및 초기화
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        (async () => {
+          try {
+            if (inviteCode) {
+              await useSocialStore.getState().joinPartyByInvite(inviteCode);
+              alert('🎉 초대 코드가 인증되어 해당 공부 파티에 자동으로 합류했습니다!');
+            } else if (joinId) {
+              await useSocialStore.getState().joinParty(joinId);
+              alert('🎉 파티 ID 식별을 통해 해당 공부 파티 가입에 성공했습니다!');
+            }
+            // 가입 후 내 파티 세션 데이터를 데이터베이스 서버풀로부터 리로드 정산
+            await useSocialStore.getState().loadMyParty();
+          } catch (error: any) {
+            alert(`❌ 파티 합류에 실패했습니다: ${error.message || '만료되었거나 잘못된 링크입니다.'}`);
+          }
+        })();
+      } else {
+        // 일반 접근 시에도 내 활성 파티 데이터 로드 가동
+        useSocialStore.getState().loadMyParty();
+      }
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -106,7 +138,7 @@ const App: React.FC = () => {
             });
           }
 
-          handleLogin();
+          login();
         } catch (error) {
           console.error('Failed to validate token:', error);
           localStorage.removeItem('access_token');
@@ -124,8 +156,8 @@ const App: React.FC = () => {
     initializeAuth();
   }, []);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
+  const handleLoginSuccess = () => {
+    login();
     const today = new Date().toLocaleDateString('en-CA');
     if (lastAttendanceDate !== today) {
       setShowAttendance(true);
@@ -141,12 +173,12 @@ const App: React.FC = () => {
     useQuestStore.persist.clearStorage();
     useQuizStore.persist.clearStorage();
     useSocialStore.persist.clearStorage();
-    setIsAuthenticated(false);
+    logout();
     navigate('/', { replace: true });
   };
 
   useEffect(() => {
-    const handleAuthSuccess = () => handleLogin();
+    const handleAuthSuccess = () => handleLoginSuccess();
     window.addEventListener('auth_success', handleAuthSuccess);
     return () => window.removeEventListener('auth_success', handleAuthSuccess);
   }, []);
@@ -159,23 +191,22 @@ const App: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-[430px] mx-auto">
-          <Routes>
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="*" element={<AuthScreen onLogin={handleLogin} />} />
-          </Routes>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[430px] mx-auto">
-        <Routes>
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/auth" element={
+          <div className="min-h-screen bg-background">
+            <div className="max-w-[430px] mx-auto">
+              <AuthScreen onLogin={handleLoginSuccess} />
+            </div>
+          </div>
+        } />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+        {/* Protected Routes with Layout */}
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/pokedex" element={<PokedexPage />} />
@@ -186,12 +217,12 @@ const App: React.FC = () => {
               <PlaceholderPage title="페이지를 찾을 수 없습니다" />
             </div>
           } />
-        </Routes>
-      </div>
-      <BottomTabBar />
+        </Route>
+      </Routes>
+
       {showAttendance && <AttendanceModal onClose={() => setShowAttendance(false)} />}
       <ConsentModal />
-    </div>
+    </>
   );
 };
 

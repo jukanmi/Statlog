@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 interface DayData {
   label: string;
@@ -87,30 +88,21 @@ const StudyBarChart: React.FC = () => {
   ];
 
   return (
-    <div style={{ background: '#1A1A2E', borderRadius: 16, padding: 20 }}>
+    <div className="bg-card rounded-2xl p-5 border border-border shadow-lg">
       {/* Title + toggle */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-      }}>
-        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>공부 시간</span>
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-foreground text-base font-bold">공부 시간</span>
+        <div className="flex gap-1.5 bg-foreground/5 rounded-full p-1">
           {(['7일', '30일'] as Period[]).map((p) => (
             <button
               key={p}
               onClick={() => handlePeriodChange(p)}
-              style={{
-                borderRadius: 20,
-                padding: '4px 12px',
-                fontSize: 12,
-                cursor: 'pointer',
-                border: 'none',
-                background: period === p ? '#C9A84C' : 'rgba(255,255,255,0.06)',
-                color: period === p ? '#000' : 'rgba(255,255,255,0.5)',
-                fontWeight: period === p ? 700 : 400,
-              }}
+              className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-bold border-none cursor-pointer transition-all duration-200",
+                period === p 
+                  ? "bg-[#C9A84C] text-background" 
+                  : "bg-transparent text-foreground/40 hover:text-foreground/60"
+              )}
             >
               {p}
             </button>
@@ -119,124 +111,123 @@ const StudyBarChart: React.FC = () => {
       </div>
 
       {/* Bar chart */}
-      <svg width="100%" viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
-        {/* Horizontal guide lines */}
-        {[0, 0.5, 1].map((pct, i) => (
-          <line
-            key={i}
-            x1={LEFT_PAD}
-            x2={SVG_W - RIGHT_PAD}
-            y1={TOP_PAD + CHART_H * (1 - pct)}
-            y2={TOP_PAD + CHART_H * (1 - pct)}
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth={1}
-          />
-        ))}
+      <div className="mb-4">
+        <svg width="100%" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="overflow-visible">
+          {/* Horizontal guide lines */}
+          {[0, 0.5, 1].map((pct, i) => (
+            <line
+              key={i}
+              x1={LEFT_PAD}
+              x2={SVG_W - RIGHT_PAD}
+              y1={TOP_PAD + CHART_H * (1 - pct)}
+              y2={TOP_PAD + CHART_H * (1 - pct)}
+              className="stroke-foreground/5"
+              strokeWidth={1}
+            />
+          ))}
 
-        {/* Y-axis labels */}
-        {yLabels.map(({ value, y }) => (
-          <text
-            key={value}
-            x={LEFT_PAD - 4}
-            y={y}
-            fontSize={10}
-            fill="rgba(255,255,255,0.35)"
-            textAnchor="end"
-          >
-            {value > 0 ? `${value}분` : '0'}
-          </text>
-        ))}
+          {/* Y-axis labels */}
+          {yLabels.map(({ value, y }) => (
+            <text
+              key={value}
+              x={LEFT_PAD - 4}
+              y={y}
+              className="fill-foreground/30 text-[10px] select-none"
+              textAnchor="end"
+            >
+              {value > 0 ? `${value}분` : '0'}
+            </text>
+          ))}
 
-        {/* Bars */}
-        {data.map((d, idx) => {
-          const slotCenter = LEFT_PAD + idx * slotW + slotW / 2;
-          const barX = slotCenter - barW / 2;
-          const barH = Math.max(2, (d.minutes / maxMin) * CHART_H);
-          const isToday = idx === data.length - 1;
-          const hasData = d.minutes > 0;
+          {/* Bars */}
+          {data.map((d, idx) => {
+            const slotCenter = LEFT_PAD + idx * slotW + slotW / 2;
+            const barX = slotCenter - barW / 2;
+            const barH = Math.max(2, (d.minutes / maxMin) * CHART_H);
+            const isToday = idx === data.length - 1;
+            const hasData = d.minutes > 0;
 
-          return (
-            <g key={idx}>
-              {/* Background track */}
-              <rect
-                x={barX}
-                y={TOP_PAD}
-                width={barW}
-                height={CHART_H}
-                rx={3}
-                fill="rgba(255,255,255,0.04)"
-              />
-
-              {/* Data bar */}
-              {hasData && (
+            return (
+              <g key={idx}>
+                {/* Background track */}
                 <rect
                   x={barX}
-                  y={barBase - barH}
+                  y={TOP_PAD}
                   width={barW}
-                  height={barH}
-                  rx={3}
-                  fill={isToday ? '#E8C96A' : '#C9A84C'}
-                  stroke={isToday ? '#C9A84C' : 'none'}
-                  strokeWidth={isToday ? 1.5 : 0}
-                  style={{
-                    transformBox: 'fill-box' as React.CSSProperties['transformBox'],
-                    transformOrigin: '50% 100%',
-                    transform: mounted ? 'scaleY(1)' : 'scaleY(0)',
-                    transition: `transform 0.6s ease-out ${idx * 0.02}s`,
-                  }}
+                  height={CHART_H}
+                  rx={barW / 2}
+                  className="fill-foreground/[0.03]"
                 />
-              )}
 
-              {/* Day label (7-day only) */}
-              {period === '7일' && (
-                <text
-                  x={slotCenter}
-                  y={barBase + 18}
-                  fontSize={11}
-                  fill={isToday ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.35)'}
-                  textAnchor="middle"
-                >
-                  {d.label}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+                {/* Data bar */}
+                {hasData && (
+                  <rect
+                    x={barX}
+                    y={barBase - barH}
+                    width={barW}
+                    height={barH}
+                    rx={barW / 2}
+                    className={cn(
+                      "transition-transform duration-700 ease-out origin-bottom",
+                      isToday ? "fill-[#E8C96A] stroke-[#C9A84C]" : "fill-[#C9A84C]"
+                    )}
+                    strokeWidth={isToday ? 1 : 0}
+                    style={{
+                      transformBox: 'fill-box' as React.CSSProperties['transformBox'],
+                      transform: mounted ? 'scaleY(1)' : 'scaleY(0)',
+                      transitionDelay: `${idx * (period === '7일' ? 30 : 5)}ms`,
+                    }}
+                  />
+                )}
+
+                {/* Day label (7-day only) */}
+                {period === '7일' && (
+                  <text
+                    x={slotCenter}
+                    y={barBase + 18}
+                    className={cn(
+                      "text-[10px] font-bold select-none",
+                      isToday ? "fill-foreground/80" : "fill-foreground/20"
+                    )}
+                    textAnchor="middle"
+                  >
+                    {d.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
 
       {/* Summary row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+      <div className="grid grid-cols-3 gap-2 mt-2">
         {[
           { label: '오늘', value: `${TODAY_MINUTES}분` },
           { label: '이번주', value: `${WEEK_MINUTES}분` },
           { label: '이번달', value: `${MONTH_MINUTES}분` },
         ].map((stat) => (
-          <div key={stat.label} style={{ textAlign: 'center' }}>
-            <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>{stat.value}</div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>{stat.label}</div>
+          <div key={stat.label} className="bg-foreground/5 rounded-xl p-2.5 text-center border border-border">
+            <div className="text-foreground text-sm font-black">{stat.value}</div>
+            <div className="text-foreground/30 text-[10px] font-bold mt-0.5">{stat.label}</div>
           </div>
         ))}
       </div>
 
       {/* 성장률 */}
-      <div style={{
-        marginTop: 14,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: growth >= 0 ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)',
-        border: `1px solid ${growth >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)'}`,
-        borderRadius: 10,
-        padding: '10px 14px',
-      }}>
-        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+      <div className={cn(
+        "mt-4 flex items-center justify-between rounded-xl px-4 py-3 border transition-all duration-300",
+        growth >= 0 
+          ? "bg-green-500/5 border-green-500/20" 
+          : "bg-red-500/5 border-red-500/20"
+      )}>
+        <span className="text-foreground/50 text-[12px] font-medium">
           {period === '7일' ? '지난 주 대비' : '지난 달 대비'} 성장률
         </span>
-        <span style={{
-          color: growth >= 0 ? '#4ADE80' : '#EF4444',
-          fontSize: 15,
-          fontWeight: 700,
-        }}>
+        <span className={cn(
+          "text-base font-black tracking-tight",
+          growth >= 0 ? "text-[#4ADE80]" : "text-[#EF4444]"
+        )}>
           {growth >= 0 ? `+${growth}%` : `${growth}%`}
         </span>
       </div>

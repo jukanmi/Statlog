@@ -1,7 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Clock } from 'lucide-react';
-import { generateQuiz, type Quiz } from '@/lib/api';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { X, Clock, Flag, Lightbulb } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { generateQuiz } from '@/lib/api';
+import { getQuizBySubject, type Quiz } from '@/lib/generateQuiz';
 import { useStudyStore } from '@/store/useStudyStore';
+import QuizReportModal from './QuizReportModal';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getRandomTip } from '@/constants/studyTips';
 
 interface QuizScreenProps {
   subject: string;
@@ -28,45 +33,187 @@ const screenStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
+function Toast({ msg }: { msg: string }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(15,15,26,0.96)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 14, padding: '11px 22px', color: '#fff', fontSize: 14,
+        zIndex: 600, whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        animation: 'toastIn 200ms ease',
+      }}
+    >
+      {msg}
+      <style>{`@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
+    </div>
+  );
+}
+
+const QuizSkeleton = ({ currentTip }: { currentTip: string }) => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        backgroundColor: '#0F0F1A',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '0 20px',
+        paddingTop: 'calc(56px + env(safe-area-inset-top))',
+        paddingBottom: 'calc(40px + env(safe-area-inset-bottom))',
+        maxWidth: 430,
+        margin: '0 auto',
+      }}
+    >
+      {/* Top Bar Skeleton */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Skeleton className="w-9 h-9 rounded-full bg-white/10" />
+          <Skeleton className="w-9 h-9 rounded-full bg-white/5" />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Skeleton className="h-5 w-16 bg-white/10" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Skeleton className="h-2 w-5 bg-white/10 rounded-full" />
+            <Skeleton className="h-2 w-2 bg-white/5 rounded-full" />
+            <Skeleton className="h-2 w-2 bg-white/5 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-10 bg-white/5" />
+        </div>
+      </div>
+
+      {/* Question Card Skeleton */}
+      <div
+        style={{
+          backgroundColor: '#1A1A2E',
+          borderRadius: 20,
+          padding: 24,
+          border: '1px solid rgba(255,255,255,0.08)',
+          marginBottom: 16,
+        }}
+      >
+        <Skeleton className="h-6 w-16 bg-white/10 rounded-full mb-4" />
+        <Skeleton className="h-5 w-full bg-white/10 mb-2" />
+        <Skeleton className="h-5 w-3/4 bg-white/10" />
+      </div>
+
+      {/* Answer Options Skeletons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '16px 20px',
+              borderRadius: 14,
+              backgroundColor: '#1A1A2E',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <Skeleton className="w-7 h-7 rounded-full bg-white/10 flex-shrink-0" />
+            <Skeleton className="h-4 w-2/3 bg-white/5" />
+          </div>
+        ))}
+      </div>
+
+      {/* Message & Tip at the bottom */}
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Study Tip Box */}
+        <div
+          style={{
+            backgroundColor: 'rgba(201,168,76,0.08)',
+            border: '1px solid rgba(201,168,76,0.15)',
+            borderRadius: 16,
+            padding: '16px 20px',
+            display: 'flex',
+            gap: 14,
+            animation: 'fadeIn 300ms ease-out',
+          }}
+        >
+          <Lightbulb size={22} style={{ color: '#C9A84C', flexShrink: 0, marginTop: 2 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              잠깐! 공부 팁
+            </span>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.6, animation: 'tipIn 500ms ease-out' }} key={currentTip}>
+              {currentTip}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: 14, color: '#C9A84C', fontWeight: 600, margin: 0, animation: 'pulse 2s infinite' }}>
+            AI가 맞춤형 복습 문제를 출제 중입니다...
+          </p>
+        </div>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+    </div>
+  );
+};
+
 const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, onSkip }) => {
-  const lastSessionQuizFromStore = useStudyStore((s) => s.lastSessionQuiz);
-  
-  const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const lastSessionQuiz = useStudyStore((s) => s.lastSessionQuiz);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [correctResults, setCorrectResults] = useState<boolean[]>([]);
   const [advancing, setAdvancing] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [currentTip, setCurrentTip] = useState(getRandomTip());
+
+  const correctAtSelect = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const totalQuestions = quizzes?.length || 0;
+  const correctCount = useMemo(() => correctResults.filter(Boolean).length, [correctResults]);
 
-  // 1. Store에 이미 퀴즈가 있다면 (StudyModal에서 생성됨) 그것을 사용
-  // 2. Store에 퀴즈가 없고 학습 내용이 있다면 AI 퀴즈 생성 시도 (Legacy/Fallback)
-  useEffect(() => {
-    if (lastSessionQuizFromStore && lastSessionQuizFromStore.length > 0) {
-      setQuizzes(lastSessionQuizFromStore);
-      return;
-    }
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2000);
+  };
 
-    let cancelled = false;
-    setQuizzes(null);
-    setLoadError(null);
-    generateQuiz(content)
-      .then((q) => {
-        if (cancelled) return;
-        if (q.length === 0) setLoadError('생성된 퀴즈가 없습니다');
-        else setQuizzes(q);
-      })
-      .catch((e) => {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : '퀴즈 생성에 실패했어요');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [content, lastSessionQuizFromStore]);
+  const handleReportSubmit = (reason: string) => {
+    console.log('Quiz reported:', { reason });
+    showToast('신고가 접수되었습니다');
+  };
+
+  // TanStack Query로 퀴즈 데이터 관리
+  const { data: quizzes, isLoading, error: loadError } = useQuery({
+    queryKey: ['quiz', content, subject],
+    queryFn: async () => {
+      // 만약 이전 세션 데이터가 있으면 그것을 우선 사용
+      if (lastSessionQuiz && lastSessionQuiz.length > 0) {
+        return lastSessionQuiz.map(item => ({
+          question: item.question,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          explanation: item.explanation,
+        }));
+      }
+
+      const q = await generateQuiz(content);
+      if (q.length === 0) {
+        const fallback = getQuizBySubject(subject);
+        if (fallback.length === 0) throw new Error('생성된 퀴즈가 없습니다');
+        return fallback;
+      }
+      return q;
+    },
+    staleTime: 1000 * 60 * 5, // 5분간 캐싱
+  });
 
   // 퀴즈 생성 실패 시: 에러를 잠시 보여준 뒤 자동으로 스킵
   useEffect(() => {
@@ -83,7 +230,37 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
 
   useEffect(() => {
     setTimeLeft(30);
+    setShowExplanation(false);
   }, [currentIndex]);
+
+  useEffect(() => {
+    let tipInterval: any;
+    if (isLoading && !loadError) {
+      setCurrentTip(getRandomTip());
+      tipInterval = setInterval(() => {
+        setCurrentTip(getRandomTip());
+      }, 5000);
+    }
+    return () => clearInterval(tipInterval);
+  }, [isLoading, loadError]);
+
+  const handleTimeout = useCallback(() => {
+    setSelectedIndex(-1);
+    setCorrectResults((prev) => {
+      const newResults = [...prev, false];
+      setAdvancing(true);
+      timeoutRef.current = setTimeout(() => {
+        if (quizzes && currentIndex < quizzes.length - 1) {
+          setCurrentIndex((p) => p + 1);
+          setSelectedIndex(null);
+          setAdvancing(false);
+        } else {
+          onComplete(newResults);
+        }
+      }, 1500);
+      return newResults;
+    });
+  }, [currentIndex, quizzes, onComplete]);
 
   useEffect(() => {
     if (!quizzes || selectedIndex !== null || advancing) return;
@@ -93,23 +270,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
     }
     const timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timerId);
-  }, [timeLeft, quizzes, selectedIndex, advancing]);
-
-  const handleTimeout = () => {
-    setSelectedIndex(-1);
-    const newResults = [...correctResults, false];
-    setCorrectResults(newResults);
-    setAdvancing(true);
-    timeoutRef.current = setTimeout(() => {
-      if (currentIndex < quizzes!.length - 1) {
-        setCurrentIndex((p) => p + 1);
-        setSelectedIndex(null);
-        setAdvancing(false);
-      } else {
-        onComplete(newResults);
-      }
-    }, 1500);
-  };
+  }, [timeLeft, quizzes, selectedIndex, advancing, handleTimeout]);
 
   // --- 에러: 잠시 표시 후 자동 스킵 ---
   if (loadError) {
@@ -120,25 +281,15 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
           퀴즈를 만들지 못했어요
         </p>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-          {loadError} · 잠시 후 다음 단계로 넘어갑니다
+          {(loadError as Error).message || '퀴즈 생성에 실패했어요'} · 잠시 후 다음 단계로 넘어갑니다
         </p>
       </div>
     );
   }
 
-  // --- 로딩: AI 퀴즈 생성 중 ---
-  if (!quizzes) {
-    return (
-      <div style={screenStyle}>
-        <div style={{ fontSize: 44, marginBottom: 16 }}>🧩</div>
-        <p style={{ fontSize: 16, color: '#FFFFFF', fontWeight: 600, margin: 0 }}>
-          AI가 복습 퀴즈를 만들고 있어요...
-        </p>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-          잠시만 기다려 주세요
-        </p>
-      </div>
-    );
+  // --- 로딩: AI 퀴즈 생성 중 (스켈레톤 적용) ---
+  if (isLoading || !quizzes) {
+    return <QuizSkeleton currentTip={currentTip} />;
   }
 
   // 여기서부터 quizzes 보장됨
@@ -165,7 +316,8 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
     setAdvancing(true);
     setShowExplanation(false);
 
-    if (currentIndex < totalQuestions - 1) {
+    if (currentIndex < TOTAL - 1) {
+      correctAtSelect.current = newResults.filter(Boolean).length;
       setCurrentIndex((p) => p + 1);
       setSelectedIndex(null);
       setAdvancing(false);
@@ -233,17 +385,32 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
         {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
         
-        {/* 닫기 버튼 (기존 유지) */}
-        <button
-          onClick={onSkip}
-          style={{
-            width: 36, height: 36, borderRadius: '50%', border: 'none',
-            backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <X size={16} />
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {/* 닫기 버튼 */}
+          <button
+            onClick={onSkip}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', border: 'none',
+              backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <X size={16} />
+          </button>
+
+          {/* 신고 버튼 */}
+          <button
+            onClick={() => setReportModalOpen(true)}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', border: 'none',
+              backgroundColor: 'rgba(239,68,68,0.1)', color: 'rgba(239,68,68,0.6)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="퀴즈 신고"
+          >
+            <Flag size={16} />
+          </button>
+        </div>
 
         {/* ▼ 새롭게 묶인 오른쪽 UI 영역 (시계 + 막대기 + 문제번호) ▼ */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -332,7 +499,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
 
       {/* Answer options */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-        {quiz.options.map((option, i) => (
+        {quiz.options?.map((option, i) => (
           <button
             key={i}
             onClick={() => handleSelect(i)}
@@ -417,19 +584,27 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
             cursor: 'pointer',
           }}
         >
-          {currentIndex < totalQuestions - 1 ? '다음' : '결과 보기'}
+          {currentIndex < TOTAL - 1 ? '다음' : '결과 보기'}
         </button>
       </div>
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
         @keyframes quizTimerPulse {
           0%, 100% { opacity: 1; }
           50% { opacity: .5; }
         }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
+
+      {/* 모달 및 알림 */}
+      <QuizReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        onSubmit={handleReportSubmit}
+      />
+      {toastMsg && <Toast msg={toastMsg} />}
     </div>
   );
 };

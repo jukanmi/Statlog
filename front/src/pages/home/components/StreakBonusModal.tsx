@@ -19,7 +19,7 @@ const StreakBonusModal: React.FC<Props> = ({ streak, onClose }) => {
   }, []);
 
   const handleClaim = () => {
-    addStats({ END: 3 });
+    addStats({ PER: 3 });
     clearStreakBonus();
     setClaimed(true);
   };
@@ -107,7 +107,7 @@ const StreakBonusModal: React.FC<Props> = ({ streak, onClose }) => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <span style={{ fontSize: 20 }}>🛡️</span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>지구력 (END)</span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>끈기 (PER)</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#A78BFA' }}>+3</span>
           </div>
         </div>

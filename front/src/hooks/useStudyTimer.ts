@@ -31,19 +31,24 @@ export function useStudyTimer(pomodoro?: PomodoroConfig) {
     return () => clearInterval(id);
   }, [timerState]);
 
+  // 📱 [1단계 검증 완료] 앱 백그라운드 전환 및 화면 이탈 즉시 실시간 정지 통제 엔진
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && timerState === 'studying') {
+      if ((document.hidden || document.visibilityState === 'hidden') && timerState === 'studying') {
+        // 즉시 스택을 정지하여 어뷰징 원천 봉쇄
         pauseTimer();
-        alert('탭이 숨겨졌습니다. 타이머가 일시정지되었습니다.');
+        console.log('[Timer Shield] 디바이스 백그라운드 전환 감지로 인해 실시간 정지 및 세이프가드가 발동되었습니다.');
       }
     };
 
+    // 브라우저 탭 전환(visibilitychange) 및 스마트폰 홈 스크린 클릭/앱 전환(blur) 더블 스캔 체계 구성
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleVisibilityChange);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
+      window.removeEventListener('blur', handleVisibilityChange);
+    };
   }, [timerState, pauseTimer]);
 
   const elapsedSeconds =
