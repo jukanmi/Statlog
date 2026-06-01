@@ -11,6 +11,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 import uuid
 from datetime import date
 from fastapi import FastAPI, HTTPException, Depends
+
+
+def _parse_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="올바르지 않은 날짜 형식입니다. YYYY-MM-DD 형식이어야 합니다.")
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from AI_routers.ai_log import StatResponse, analyze_log_to_stats, router as ai_router
@@ -133,7 +140,7 @@ async def save_study_session(
         subject=session.subject,
         content=session.content,
         duration_minutes=session.duration_minutes,
-        date=date.fromisoformat(session.date),
+        date=_parse_date(session.date),
         stat_gained=gained,
         quiz_results=session.quiz_results,
     )
