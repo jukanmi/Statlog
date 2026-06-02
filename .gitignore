@@ -255,3 +255,8 @@ dev-dist
 
 *.pem
 *.db
+
+# Test Python files
+test_*.py
+
+#documentation
