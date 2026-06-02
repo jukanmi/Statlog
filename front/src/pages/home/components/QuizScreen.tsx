@@ -311,7 +311,6 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   }
 
   // 여기서부터 quizzes 보장됨
-  const TOTAL = quizzes.length;
   const quiz = quizzes[currentIndex];
 
   const handleSelect = (optionIndex: number) => {
