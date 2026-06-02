@@ -35,7 +35,7 @@ def get_user_by_id(db: Session, user_id: str) -> User | None:
     return db.query(User).filter_by(id=user_id).first()
 
 
-async def get_user_by_id(user_id: str):
+async def get_mock_user_by_id(user_id: str):
     """실제 DB 연동 전까지 사용할 가짜 유저 조회 함수"""
     # dummy user object
     class DummyUser:
