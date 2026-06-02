@@ -6,7 +6,7 @@ import { voteQuizOnServer, reportQuizOnServer } from '@/lib/api';
 const REPORT_HIDE_THRESHOLD = 3;
 const OFFICIAL_UPVOTE_THRESHOLD = 5;
 
-type NewQuiz = Omit<UserQuiz, 'id' | 'createdAt'>;
+type NewQuiz = Omit<UserQuiz, 'id' | 'createdAt'> & { id?: string };
 
 interface QuizStoreState {
   userQuizzes: UserQuiz[];
@@ -40,7 +40,7 @@ export const useQuizStore = create<QuizStoreState>()(
             ...state.userQuizzes,
             {
               ...quiz,
-              id: `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              id: quiz.id ?? `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
               createdAt: new Date().toISOString(),
             },
           ],
