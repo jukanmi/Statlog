@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, API_BASE_URL } from './apiClient';
 import type { Stats, AIStats } from '@/types';
 
 // 백엔드 StatResponse: 6대 능력치 + EXP
@@ -36,10 +36,7 @@ export async function convertStudyToStats(
     return data.stat_gained;
   } catch (error) {
     console.error('convertStudyToStats error:', error);
-    // Fallback Mock Data
-    return {
-      HUM: 1, SOC: 1, NAT: 1, COL: 1, PER: 1, ART: 1, EXP: 10
-    };
+    return { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 };
   }
 }
 
@@ -71,6 +68,7 @@ export async function generateQuiz(content: string): Promise<Quiz[]> {
       question: q.question,
       options: q.options,
       correctIndex: q.correct_index,
+      explanation: q.explanation,
     }));
   } catch (error) {
     console.error('generateQuiz (api.ts) error:', error);
@@ -312,9 +310,13 @@ export async function updateCharacterExpOnServer(payload: CharacterExpRequest): 
 }
 
 export async function downloadPortfolioPdf(): Promise<Blob> {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  const mockContent = "%PDF-1.4 ... [Mock Portfolio Data] ...";
-  return new Blob([mockContent], { type: 'application/pdf' });
+  const token = localStorage.getItem('access_token');
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/portfolio/download`, {
+    method: 'GET',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`포트폴리오 PDF 생성 실패 (HTTP ${res.status})`);
+  return res.blob();
 }
 
 // ================= 👥 파티 & 랭킹 연동 API 명세 파트 =================
