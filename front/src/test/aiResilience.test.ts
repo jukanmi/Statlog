@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateStats, generateQuiz } from '../lib/aiApi';
+import { convertStudyToStats, generateQuiz } from '../lib/api';
 
 // fetch 모킹
 global.fetch = vi.fn();
