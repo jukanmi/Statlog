@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import { generateQuiz } from '@/lib/api';
+import { generateQuiz, saveStudySessionWithStats } from '@/lib/api';
 import type { StudySession } from '@/types';
 import type { Quiz } from '@/lib/api';
 import { Loader2, Lightbulb } from 'lucide-react';
@@ -50,8 +50,13 @@ const StudyModal: React.FC<StudyModalProps> = ({
   // --- 낙관적 업데이트를 적용한 Mutation ---
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // 퀴즈 생성 (stats는 StatUpdateScreen에서 별도 계산)
-      const aiQuiz = await generateQuiz(content);
+      const date = new Date().toISOString().split('T')[0];
+      const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+      const [aiQuiz] = await Promise.all([
+        generateQuiz(content),
+        saveStudySessionWithStats({ subject, content, durationMinutes, date, quizResults: [] })
+          .catch((e) => console.warn('세션 백엔드 저장 실패:', e)),
+      ]);
       return { aiStats: null, aiQuiz };
     },
     

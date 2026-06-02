@@ -1,7 +1,6 @@
 import { useUserStore } from '@/store/useUserStore';
+import { useStudyStore } from '@/store/useStudyStore';
 import { cn } from '@/lib/utils';
-
-const TOTAL_MINUTES = 2220; // sum of MOCK_30 data
 
 interface CellDef {
   icon: string;
@@ -14,6 +13,8 @@ interface CellDef {
 
 const CurrencyCard: React.FC = () => {
   const { user, ownedCharacterIds } = useUserStore();
+  const sessions = useStudyStore((s) => s.sessions);
+  const totalMinutes = sessions.reduce((a, s) => a + s.durationMinutes, 0);
 
   const cells: CellDef[] = [
     {
@@ -42,7 +43,7 @@ const CurrencyCard: React.FC = () => {
     },
     {
       icon: '⏱️',
-      value: `${Math.floor(TOTAL_MINUTES / 60)}h ${TOTAL_MINUTES % 60}m`,
+      value: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
       label: '총 학습',
       valueColor: 'text-[#A78BFA]',
       bg: 'bg-purple-500/10',

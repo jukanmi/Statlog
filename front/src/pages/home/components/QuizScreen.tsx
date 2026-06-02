@@ -181,7 +181,6 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const correctCount = useMemo(() => correctResults.filter(Boolean).length, [correctResults]);
-  const TOTAL = quizzes?.length || 0;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -232,6 +231,8 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
     },
     staleTime: 1000 * 60 * 5, // 5분간 캐싱
   });
+
+  const TOTAL = quizzes?.length || 0;
 
   // 퀴즈 생성 실패 시: 에러를 잠시 보여준 뒤 자동으로 스킵
   useEffect(() => {

@@ -126,19 +126,7 @@ export async function getUserProfile(token: string) {
       last_attendance_date: data.last_attendance_date ?? null,
     };
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHORIZED') throw error;
-    console.warn('Backend profile API failed, using mock data:', error);
-    return {
-      id: 'user-001',
-      nickname: '탐험가(Mock)',
-      profileImage: null,
-      stats: { HUM: 50, SOC: 0, NAT: 10, COL: 0, PER: 0, ART: 0, COP: 0 },
-      aiStats: { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
-      gold: 1200,
-      gems: 30,
-      level: 7,
-      exp: 340,
-    };
+    throw error;
   }
 }
 
@@ -314,9 +302,12 @@ export async function updateCharacterExpOnServer(payload: CharacterExpRequest): 
 }
 
 export async function downloadPortfolioPdf(): Promise<Blob> {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  const mockContent = "%PDF-1.4 ... [Mock Portfolio Data] ...";
-  return new Blob([mockContent], { type: 'application/pdf' });
+  const token = localStorage.getItem('access_token');
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me/portfolio/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`포트폴리오 생성 실패 (HTTP ${res.status})`);
+  return res.blob();
 }
 
 // ================= 👥 파티 & 랭킹 연동 API 명세 파트 =================
