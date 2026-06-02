@@ -38,7 +38,8 @@ const StudyModalsContainer: React.FC<StudyModalsContainerProps> = ({
   formattedTime,
 }) => {
   const { dailyStudyGoalMinutes, dailyStudyGoalSubject, updateDailyStudyGoal } = useQuestStore();
-  const { studyStreak, todayMinutes } = useStudyStore();
+  const studyStreak = useStudyStore((s) => s.studyStreak);
+  const todayMinutes = useStudyStore((s) => s.todayMinutes);
 
   return (
     <>
