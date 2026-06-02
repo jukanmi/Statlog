@@ -66,7 +66,7 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
       // 낙관적으로 스토어 미리 업데이트 (세션 추가)
       const optimisticSession: StudySession = {
-        id: `temp-${crypto.randomUUID()}`,
+        id: `temp-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)}`,
         subject,
         content,
         durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
