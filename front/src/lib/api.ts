@@ -111,7 +111,7 @@ export async function getUserProfile(token: string) {
       id: data.id || 'user-001',
       nickname: data.nickname || '탐험가',
       profileImage: data.profile_image || null,
-      stats: data.stats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, COP: 0 },
+      stats: data.stats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0 },
       aiStats: data.ai_stats || { HUM: 0, SOC: 0, NAT: 0, COL: 0, PER: 0, ART: 0, EXP: 0 },
       gold: data.gold ?? 1000,
       gems: data.gems ?? 30,
