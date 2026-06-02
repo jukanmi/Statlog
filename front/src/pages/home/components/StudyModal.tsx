@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import type { StudySession } from '@/types';
-import { syncUserToServer, encodeBitmask } from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import { generateQuiz, type Quiz } from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { generateQuiz } from '@/lib/api';
+import type { StudySession } from '@/types';
+import type { Quiz } from '@/lib/api';
+import { Loader2, Lightbulb } from 'lucide-react';
+import { toast } from 'sonner';
+import { getRandomTip } from '@/constants/studyTips';
 
 interface StudyModalProps {
   isOpen: boolean;
@@ -23,16 +26,140 @@ const StudyModal: React.FC<StudyModalProps> = ({
   onSave,
   onClose,
 }) => {
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [subject, setSubject] = useState<string>('수학');
   const [content, setContent] = useState('');
   const [textareaFocused, setTextareaFocused] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [currentTip, setCurrentTip] = useState(getRandomTip());
 
   const addSession = useStudyStore((s) => s.addSession);
   const setLastSessionStats = useStudyStore((s) => s.setLastSessionStats);
   const setLastSessionQuiz = useStudyStore((s) => s.setLastSessionQuiz);
+
+  // Loading steps for progressive UI
+  const loadingMessages = [
+    '학습 데이터 추출 중...',
+    '6대 능력치 분석 중...',
+    '복습 퀴즈 생성 중...',
+    '거의 다 되었어요!'
+  ];
+
+  // --- 낙관적 업데이트를 적용한 Mutation ---
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // 퀴즈 생성 (stats는 StatUpdateScreen에서 별도 계산)
+      const aiQuiz = await generateQuiz(content);
+      return { aiStats: null, aiQuiz };
+    },
+    
+    // 1. Mutate 시작 시 호출 (낙관적 업데이트 로직)
+    onMutate: async () => {
+      // 관련 쿼리 취소 (진행 중인게 있다면)
+      await queryClient.cancelQueries({ queryKey: ['study-history'] });
+
+      // 이전 상태 스냅샷 저장 (롤백용)
+      const previousSessions = useStudyStore.getState().sessions;
+      const previousTodayMinutes = useStudyStore.getState().todayMinutes;
+
+      // 낙관적으로 스토어 미리 업데이트 (세션 추가)
+      const optimisticSession: StudySession = {
+        id: `temp-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)}`,
+        subject,
+        content,
+        durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+        date: new Date().toISOString().split('T')[0],
+        statGained: {},
+        // 분석 전이므로 aiStatGained는 일단 비워둠 (UI에서 '분석중' 표시 가능)
+      };
+      
+      addSession(optimisticSession);
+
+      // 스냅샷 반환
+      return { previousSessions, previousTodayMinutes };
+    },
+
+    // 2. 성공 시 호출
+    onSuccess: ({ aiStats: _aiStats, aiQuiz }) => {
+      // AI 결과 확인 및 알림
+      if (aiQuiz && aiQuiz[0]?.question.includes('[timeout]')) {
+        toast.warning('서버 보호 모드 작동 중: 임시 퀴즈가 제공됩니다.');
+      } else {
+        toast.success('학습 기록 분석이 완료되었습니다!');
+      }
+
+      // stats는 StatUpdateScreen에서 별도 계산, 퀴즈만 저장
+      setLastSessionStats(null);
+      setLastSessionQuiz(aiQuiz || null);
+
+      // 익명 분석 데이터 전송
+      if (useUserStore.getState().dataCollectionConsent) {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        fetch(baseUrl + '/api/v1/analytics/study-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            duration_minutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+            subject: subject,
+            timestamp: new Date().toISOString(),
+          })
+        }).catch(err => console.error('Failed to send anonymous analytics:', err));
+      }
+
+      // 폼 초기화 및 닫기
+      setContent('');
+      setSubject('수학');
+      onSave();
+    },
+
+    // 3. 에러 발생 시 호출 (롤백)
+    onError: (err, variables, context) => {
+      console.error('saveMutation error:', err);
+      
+      // 롤백 로직: 스냅샷을 사용하여 이전 상태로 복구
+      // (현재 zustand persist 구조상 복잡할 수 있으나, 개념적으로 temp 세션을 제거)
+      const currentSessions = useStudyStore.getState().sessions;
+      const filteredSessions = currentSessions.filter(s => !s.id.startsWith('temp-'));
+      
+      useStudyStore.setState({ 
+        sessions: filteredSessions,
+        // todayMinutes 등은 간단하게 다시 계산하거나 저장된 컨텍스트 사용
+        todayMinutes: context?.previousTodayMinutes ?? useStudyStore.getState().todayMinutes
+      });
+
+      toast.error('저장에 실패하여 기록이 취소되었습니다.');
+    },
+
+    // 4. 완료 후 (성공/실패 무관)
+    onSettled: () => {
+      // 필요 시 쿼리 무효화 (서버 데이터 싱크용)
+      queryClient.invalidateQueries({ queryKey: ['study-history'] });
+    }
+  });
+
+  const isGenerating = saveMutation.isPending;
+
+  useEffect(() => {
+    let interval: any;
+    let tipInterval: any;
+    if (isGenerating) {
+      setLoadingStep(0);
+      setCurrentTip(getRandomTip());
+      interval = setInterval(() => {
+        setLoadingStep((prev) => (prev < loadingMessages.length - 1 ? prev + 1 : prev));
+      }, 2500);
+
+      tipInterval = setInterval(() => {
+        setCurrentTip(getRandomTip());
+      }, 5000);
+    }
+    return () => {
+      clearInterval(interval);
+      clearInterval(tipInterval);
+    };
+  }, [isGenerating]);
 
   // Mount → next tick → slide up
   useEffect(() => {
@@ -49,66 +176,12 @@ const StudyModal: React.FC<StudyModalProps> = ({
 
   if (!mounted) return null;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!content.trim()) {
-      alert('학습 내용을 입력해주세요!');
+      toast.error('학습 내용을 입력해주세요!');
       return;
     }
-
-    setIsGenerating(true);
-    let aiQuiz: Quiz[] | undefined;
-
-    try {
-      const quizResult = await generateQuiz(content);
-      aiQuiz = quizResult;
-    } catch (error) {
-      console.error('generateQuiz 실패:', error);
-      alert('AI 처리에 실패하여 기본 퀴즈로 대체합니다.');
-    } finally {
-      setIsGenerating(false);
-    }
-
-    // 2. Save session to DB (stat_gained는 퀴즈 정답 후 별도 요청)
-    const session: StudySession = {
-      id: crypto.randomUUID(),
-      subject,
-      content,
-      durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
-      date: new Date().toISOString().split('T')[0],
-      statGained: {},
-      aiStatGained: undefined,
-    };
-
-    if (useUserStore.getState().dataCollectionConsent) {
-      fetch(import.meta.env.VITE_API_URL + '/api/v1/analytics/study-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          duration_minutes: session.durationMinutes,
-          subject: session.subject,
-          timestamp: new Date().toISOString(),
-        })
-      }).catch(err => console.error('Failed to send anonymous analytics:', err));
-    }
-
-    // 3. 퀴즈 저장, 스탯은 퀴즈 정답 후 요청하므로 null로 초기화
-    setLastSessionStats(null);
-    setLastSessionQuiz(aiQuiz || null);
-    addSession(session);  // ← 여기서 studyStreak 업데이트됨
-
-    // 4. addSession 이후 최신 studyStreak 읽기
-    const { ownedCharacterIds, equippedCharacterId, characterExpMap } = useUserStore.getState();
-    const { studyStreak } = useStudyStore.getState();
-    syncUserToServer({
-      study_streak: studyStreak,
-      owned_characters_bits: encodeBitmask(ownedCharacterIds),
-      equipped_character_id: equippedCharacterId,
-      character_exp_map: characterExpMap,
-    });
-
-    setContent('');
-    setSubject('수학');
-    onSave();
+    saveMutation.mutate();
   };
 
   return (
@@ -239,48 +312,77 @@ const StudyModal: React.FC<StudyModalProps> = ({
           />
         </div>
 
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          disabled={isGenerating}
-          style={{
-            width: '100%',
-            height: 52,
-            backgroundColor: '#C9A84C',
-            border: 'none',
-            borderRadius: 14,
-            color: '#0F0F1A',
-            fontSize: 16,
-            fontWeight: 700,
-            cursor: isGenerating ? 'not-allowed' : 'pointer',
-            marginTop: 4,
-            transition: 'opacity 150ms ease, transform 150ms ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-          }}
-          onMouseDown={(e) => {
-            if (isGenerating) return;
-            (e.currentTarget as HTMLButtonElement).style.opacity = '0.85';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)';
-          }}
-          onMouseUp={(e) => {
-            if (isGenerating) return;
-            (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-          }}
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              AI 분석 중...
-            </>
-          ) : (
-            '기록 저장하기'
+        {/* Save button & Loading Tip */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+          <button
+            onClick={handleSave}
+            disabled={isGenerating}
+            style={{
+              width: '100%',
+              height: 52,
+              backgroundColor: '#C9A84C',
+              border: 'none',
+              borderRadius: 14,
+              color: '#0F0F1A',
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: isGenerating ? 'not-allowed' : 'pointer',
+              transition: 'opacity 150ms ease, transform 150ms ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+            onMouseDown={(e) => {
+              if (isGenerating) return;
+              (e.currentTarget as HTMLButtonElement).style.opacity = '0.85';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.98)';
+            }}
+            onMouseUp={(e) => {
+              if (isGenerating) return;
+              (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+            }}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                {loadingMessages[loadingStep]}
+              </>
+            ) : (
+              '기록 저장하기'
+            )}
+          </button>
+
+          {isGenerating && (
+            <div
+              style={{
+                backgroundColor: 'rgba(201,168,76,0.08)',
+                border: '1px solid rgba(201,168,76,0.15)',
+                borderRadius: 12,
+                padding: '12px 16px',
+                display: 'flex',
+                gap: 10,
+                animation: 'fadeIn 300ms ease-out',
+              }}
+            >
+              <Lightbulb size={18} style={{ color: '#C9A84C', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Study Tip
+                </span>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5, animation: 'tipIn 500ms ease-out' }} key={currentTip}>
+                  {currentTip}
+                </p>
+              </div>
+            </div>
           )}
-        </button>
+        </div>
       </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 };

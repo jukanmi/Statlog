@@ -39,6 +39,39 @@
     --surface: 233 33% 14%;
     --card-border: 0 0% 100% / 0.08;
   }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 233 33% 8%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 233 33% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 233 33% 8%;
+
+    --primary: 43 52% 54%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 263 84% 58%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 233 10% 40%;
+
+    --accent: 263 84% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 0% / 0.08;
+    --input: 0 0% 0% / 0.08;
+    --ring: 43 52% 54%;
+
+    --surface: 0 0% 96%;
+    --card-border: 0 0% 0% / 0.08;
+  }
 }
 
 @layer base {

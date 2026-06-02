@@ -9,60 +9,35 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onSettingsClick }) => {
   const { user } = useUserStore();
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #1A1A2E, #2D1B4E)',
-      border: '1px solid rgba(124,58,237,0.3)',
-      borderRadius: 20,
-      padding: 20,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-    }}>
+    <div className="bg-card border border-purple-500/30 rounded-[20px] p-5 flex items-center gap-4 shadow-xl">
       {/* Avatar */}
-      <div style={{
-        width: 64,
-        height: 64,
-        borderRadius: '50%',
-        flexShrink: 0,
-        background: 'linear-gradient(135deg, #7C3AED, #C9A84C)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-      }}>
+      <div className="w-16 h-16 rounded-full shrink-0 bg-gradient-to-br from-[#7C3AED] to-[#C9A84C] flex items-center justify-center overflow-hidden border-2 border-border">
         {user.profileImage ? (
           <img
             src={user.profileImage}
             alt="profile"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            className="w-full h-full object-cover"
           />
         ) : (
-          <span style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>
+          <span className="text-white text-[28px] font-bold">
             {user.nickname[0]}
           </span>
         )}
       </div>
 
       {/* Info */}
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>{user.nickname}</span>
-          <span style={{
-            background: 'rgba(124,58,237,0.2)',
-            color: '#A78BFA',
-            borderRadius: 20,
-            padding: '3px 10px',
-            fontSize: 12,
-            fontWeight: 600,
-          }}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-foreground text-xl font-bold truncate">{user.nickname}</span>
+          <span className="bg-purple-500/20 text-[#A78BFA] rounded-full px-2.5 py-0.5 text-[12px] font-bold border border-purple-500/20">
             Lv.{user.level}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+        <div className="flex gap-4 mt-1.5">
+          <span className="text-foreground/50 text-[13px] font-medium flex items-center gap-1">
             🪙 {user.gold.toLocaleString()}
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+          <span className="text-foreground/50 text-[13px] font-medium flex items-center gap-1">
             💎 {user.gems}
           </span>
         </div>
@@ -71,15 +46,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ onSettingsClick }) => {
       {/* Settings button */}
       <button
         onClick={onSettingsClick}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'rgba(255,255,255,0.4)',
-          padding: 4,
-          display: 'flex',
-          alignItems: 'center',
-        }}
+        className="bg-transparent border-none cursor-pointer text-foreground/40 p-2 flex items-center hover:text-foreground/70 hover:bg-foreground/5 rounded-full transition-all"
       >
         <Settings size={22} />
       </button>

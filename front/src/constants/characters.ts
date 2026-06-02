@@ -1,11 +1,4 @@
-export type GachaCharacter = {
-  id: string;
-  name: string;
-  grade: 'S' | 'A' | 'B' | 'C';
-  subject: string;
-  description: string;
-  imageUrl: string; // 🖼️ API 또는 로컬 이미지 주소를 보관할 필드 추가
-};
+import { Character } from '@/types';
 
 export const GRADE_COLORS: Record<string, { bg: string; border: string; glow: string; text: string }> = {
   S: { bg: '#2D1B69', border: '#7C3AED', glow: 'rgba(124,58,237,0.5)', text: '#D8B4E2' },
@@ -33,13 +26,13 @@ export const EVOLUTION_CHAIN: Record<string, string> = {
   'char_8': 'char_12',  // 프린스 클라우드(A) -> 엠페러 클라우드(S)
 };
 
-export const ALL_CHARACTERS: GachaCharacter[] = [
+export const ALL_CHARACTERS: Character[] = [
   { 
     id: 'char_1', 
     name: '공부엉이', 
     grade: 'C', 
     subject: '과학', 
-    imageUrl: '/characters/char_1.png', // 🦉 public/characters/char_1.png 매핑
+    imageUrl: '/characters/char_1.png',
     description: '대학생들이 들고 다니는 아이패드 전자기파가 모여 탄생한 부엉이. 밤새 지식과 학문을 탐구하는 것이 특기입니다.' 
   },
   { 
@@ -131,17 +124,3 @@ export const ALL_CHARACTERS: GachaCharacter[] = [
     description: '노력의 가치를 수호하는 구름 황제. 열공하는 자에겐 아름다운 황금빛 오로라를, 태만한 자에겐 번개 징벌을 내립니다.' 
   }
 ];
-
-export function pullOne(): GachaCharacter {
-  const rand = Math.random();
-  let grade: 'S' | 'A' | 'B' | 'C' = 'C';
-  if (rand < 0.03) grade = 'S';
-  else if (rand < 0.15) grade = 'A';
-  else if (rand < 0.5) grade = 'B';
-  const pool = ALL_CHARACTERS.filter(c => c.grade === grade);
-  return pool[Math.floor(Math.random() * pool.length)] || ALL_CHARACTERS[0];
-}
-
-export function pullTen(): GachaCharacter[] {
-  return Array.from({ length: 10 }, () => pullOne());
-}

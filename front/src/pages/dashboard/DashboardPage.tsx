@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import ProfileCard from './components/ProfileCard';
+import EquippedCharacterCard from './components/EquippedCharacterCard';
+import TodaySummaryCard from './components/TodaySummaryCard';
 import StatRadarChart from './components/StatRadarChart';
+import StatGrowthChart from './components/StatGrowthChart';
 import StudyBarChart from './components/StudyBarChart';
+import StreakHeatmap from './components/StreakHeatmap';
+import RankingCard from './components/RankingCard';
 import SubjectStats from './components/SubjectStats';
 import CurrencyCard from './components/CurrencyCard';
-import RankingCard from './components/RankingCard';
 import SettingsModal from './components/SettingsModal';
 import { downloadPortfolioPdf } from '@/lib/api';
 
@@ -41,9 +45,10 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
   };
 
   return (
-    <div style={{ backgroundColor: '#0F0F1A', minHeight: '100dvh' }}>
+    <div className="bg-background min-h-[100dvh]">
       <div style={{
-        padding: 16,
+        backgroundColor: '#0F0F1A',
+        padding: '16px',
         paddingTop: 'calc(env(safe-area-inset-top) + 16px)',
         paddingBottom: 90,
         display: 'flex',
@@ -51,7 +56,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
         gap: 20,
       }}>
         <ProfileCard onSettingsClick={() => setShowSettings(true)} />
-          <button
+        <button
           onClick={handleDownloadPortfolio}
           disabled={isGenerating}
           style={{
@@ -70,8 +75,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
         >
           {isGenerating ? '🤖 AI가 포트폴리오를 디자인하는 중...' : '✨ 취업용 AI 포트폴리오 PDF 추출 (Premium)'}
         </button>
+        <EquippedCharacterCard />
+        <TodaySummaryCard />
         <StatRadarChart />
+        <StatGrowthChart />
         <StudyBarChart />
+        <StreakHeatmap />
         <RankingCard />
         <SubjectStats />
         <CurrencyCard />

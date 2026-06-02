@@ -27,94 +27,36 @@ const AttendanceModal: React.FC<Props> = ({ onClose }) => {
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 200,
-        padding: '0 24px',
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#1A1A2E',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 24,
-          padding: 32,
-          width: '100%',
-          maxWidth: 340,
-          textAlign: 'center',
-        }}
-      >
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🎁</div>
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[200] px-6">
+      <div className="bg-[#1A1A2E] border border-white/10 rounded-[24px] p-8 w-full max-w-[340px] text-center shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="text-[48px] mb-4">🎁</div>
 
-        <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
-          출석 보상
-        </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 28 }}>
-          오늘도 접속했군요!
-        </div>
+        <h2 className="text-xl font-bold text-white mb-1.5">출석 보상</h2>
+        <p className="text-[13px] text-white/40 mb-7">오늘도 접속했군요!</p>
 
         {/* Reward display */}
-        <div
-          style={{
-            backgroundColor: 'rgba(201,168,76,0.08)',
-            border: '1px solid rgba(201,168,76,0.2)',
-            borderRadius: 16,
-            padding: '20px 24px',
-            marginBottom: 24,
-            display: 'flex',
-            gap: 24,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 24 }}>🪙</span>
-            <span style={{ fontSize: 26, fontWeight: 700, color: '#C9A84C' }}>+{DAILY_REWARD.gold}</span>
+        <div className="bg-[#C9A84C]/10 border border-[#C9A84C]/20 rounded-2xl py-5 px-6 mb-6 flex gap-6 justify-center items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🪙</span>
+            <span className="text-[26px] font-bold text-[#C9A84C]">+{DAILY_REWARD.gold}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 24 }}>💎</span>
-            <span style={{ fontSize: 26, fontWeight: 700, color: '#A78BFA' }}>+{DAILY_REWARD.gems}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">💎</span>
+            <span className="text-[26px] font-bold text-[#A78BFA]">+{DAILY_REWARD.gems}</span>
           </div>
         </div>
 
         {!claimed ? (
           <button
             onClick={handleClaim}
-            style={{
-              width: '100%',
-              height: 52,
-              backgroundColor: '#C9A84C',
-              border: 'none',
-              borderRadius: 14,
-              color: '#0F0F1A',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 0 20px rgba(201,168,76,0.35)',
-            }}
+            className="w-full h-[52px] bg-[#C9A84C] text-[#0F0F1A] rounded-2xl text-base font-bold cursor-pointer shadow-[0_0_20px_rgba(201,168,76,0.35)] active:scale-95 transition-transform"
           >
             받기
           </button>
         ) : (
           <button
             onClick={onClose}
-            style={{
-              width: '100%',
-              height: 52,
-              backgroundColor: 'transparent',
-              border: '1.5px solid rgba(255,255,255,0.15)',
-              borderRadius: 14,
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="w-full h-[52px] bg-transparent border-[1.5px] border-white/15 rounded-2xl text-white/70 text-base font-semibold cursor-pointer active:scale-95 transition-transform"
           >
             확인
           </button>

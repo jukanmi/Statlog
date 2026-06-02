@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { ALL_CHARACTERS, GRADE_COLORS, type GachaCharacter } from '@/lib/gachaSystem';
+import { ALL_CHARACTERS, GRADE_COLORS } from '@/constants/characters';
+import { type Character } from '@/types';
+import { calcLevel, getDisplayCharacterId } from '@/lib/characterLevel';
 import CharacterDetailModal from './CharacterDetailModal';
+import { cn } from '@/lib/utils';
 
 type GradeFilter = 'all' | 'S' | 'A' | 'B' | 'C';
 const FILTERS: GradeFilter[] = ['all', 'S', 'A', 'B', 'C'];
@@ -9,8 +12,9 @@ const FILTER_LABELS: Record<GradeFilter, string> = { all: '전체', S: 'S', A: '
 
 const CollectionScreen: React.FC = () => {
   const ownedIds = useUserStore((s) => s.ownedCharacterIds);
+  const characterExpMap = useUserStore((s) => s.characterExpMap);
   const [filter, setFilter] = useState<GradeFilter>('all');
-  const [selectedChar, setSelectedChar] = useState<GachaCharacter | null>(null);
+  const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [barAnimated, setBarAnimated] = useState(false);
 
@@ -27,61 +31,42 @@ const CollectionScreen: React.FC = () => {
     ? ALL_CHARACTERS
     : ALL_CHARACTERS.filter((c) => c.grade === filter);
 
-  const handleCardClick = (char: GachaCharacter) => {
+  const handleCardClick = (char: Character) => {
     if (!ownedSet.has(char.id)) return;
     setSelectedChar(char);
     setIsDetailOpen(true);
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: '#0F0F1A',
-        minHeight: 'calc(100dvh - 100px)',
-        paddingBottom: 'calc(90px + env(safe-area-inset-bottom))',
-      }}
-    >
+    <div className="bg-background min-h-[calc(100dvh-100px)] pb-[calc(90px+env(safe-area-inset-bottom))]">
       {/* Header */}
-      <div style={{ padding: '24px 16px 16px' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#FFFFFF', margin: 0, marginBottom: 4 }}>
-          나의 도감
-        </h2>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 12px' }}>
-          {ownedCount} / {total} 수집완료
-        </p>
+      <div className="p-6 pb-4">
+        <div className="flex justify-between items-end mb-1.5">
+          <h2 className="text-xl font-bold text-foreground m-0">나의 도감</h2>
+          <p className="text-[13px] text-foreground/40 m-0">
+            {ownedCount} / {total} 수집완료
+          </p>
+        </div>
 
         {/* Progress bar */}
-        <div style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+        <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
           <div
-            style={{
-              height: '100%',
-              width: barAnimated ? `${(ownedCount / total) * 100}%` : '0%',
-              background: 'linear-gradient(90deg, #C9A84C 0%, #E8CC7A 100%)',
-              borderRadius: 3,
-              transition: 'width 700ms ease-out',
-            }}
+            className="h-full bg-gradient-to-r from-[#C9A84C] to-[#E8CC7A] rounded-full transition-all duration-700 ease-out"
+            style={{ width: barAnimated ? `${(ownedCount / total) * 100}%` : '0%' }}
           />
         </div>
       </div>
 
       {/* Filter row */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div className="flex gap-2 px-4 pb-4 overflow-x-auto scrollbar-none">
         {FILTERS.map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            style={{
-              flexShrink: 0,
-              backgroundColor: filter === f ? '#C9A84C' : '#1A1A2E',
-              color: filter === f ? '#0F0F1A' : 'rgba(255,255,255,0.45)',
-              border: 'none',
-              borderRadius: 20,
-              padding: '6px 16px',
-              fontSize: 13,
-              fontWeight: filter === f ? 700 : 500,
-              cursor: 'pointer',
-              transition: 'background-color 150ms ease, color 150ms ease',
-            }}
+            className={cn(
+              "flex-shrink-0 border-none rounded-full px-4 py-1.5 text-[13px] font-bold cursor-pointer transition-all duration-200",
+              filter === f ? "bg-[#C9A84C] text-background" : "bg-card text-foreground/45 hover:text-foreground/70"
+            )}
           >
             {FILTER_LABELS[f]}
           </button>
@@ -89,7 +74,7 @@ const CollectionScreen: React.FC = () => {
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '0 16px' }}>
+      <div className="grid grid-cols-3 gap-2.5 px-4">
         {filtered.map((char) => {
           const isOwned = ownedSet.has(char.id);
           const colors = GRADE_COLORS[char.grade];
@@ -99,98 +84,96 @@ const CollectionScreen: React.FC = () => {
               key={char.id}
               onClick={() => handleCardClick(char)}
               disabled={!isOwned}
-              style={{
-                backgroundColor: isOwned ? '#1A1A2E' : '#0E0E1A',
-                border: `1px solid ${isOwned ? colors.border : 'rgba(255,255,255,0.05)'}`,
-                borderRadius: 14,
-                padding: '12px 8px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 6,
-                cursor: isOwned ? 'pointer' : 'default',
-                position: 'relative',
-                transition: 'transform 150ms ease',
-              }}
-              onMouseDown={(e) => { if (isOwned) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)'; }}
-              onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+              className={cn(
+                "rounded-2xl p-3 px-2 flex flex-col items-center gap-1.5 relative transition-all duration-200 active:scale-95 border",
+                isOwned 
+                  ? "bg-card cursor-pointer" 
+                  : "bg-background cursor-default border-border opacity-80"
+              )}
+              style={isOwned ? { borderColor: colors.border } : {}}
             >
               {/* Grade badge */}
               <div
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  backgroundColor: isOwned ? colors.bg : 'rgba(255,255,255,0.04)',
-                  color: isOwned ? colors.text : 'rgba(255,255,255,0.2)',
-                  borderRadius: 10,
-                  padding: '2px 7px',
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
+                className={cn(
+                  "absolute top-2 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-black",
+                  isOwned ? "bg-opacity-100" : "bg-foreground/5 text-foreground/20"
+                )}
+                style={isOwned ? { backgroundColor: colors.bg, color: colors.text } : {}}
               >
                 {isOwned ? char.grade : '?'}
               </div>
 
-              {/* Avatar circle (이미지 전용 태그 전환 완료 🖼️) */}
+              {/* Avatar circle */}
               <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  backgroundColor: isOwned ? `color-mix(in srgb, ${colors.bg} 60%, transparent)` : 'rgba(255,255,255,0.03)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 4,
-                  border: isOwned ? `1px solid ${colors.border}30` : '1px solid rgba(255,255,255,0.06)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
+                className={cn(
+                  "w-14 h-14 rounded-full flex items-center justify-center mt-1 border relative overflow-hidden",
+                  isOwned ? "bg-opacity-20" : "bg-foreground/5 border-border"
+                )}
+                style={isOwned ? { backgroundColor: colors.bg, borderColor: `${colors.border}40` } : {}}
               >
-                {/* 🖼️ 이미지가 연동된 메인 태그 구역 */}
-                <img 
-                  src={char.imageUrl} 
-                  alt={char.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    // 미획득 상태일 때 기획서 규격대로 완전 실루엣(검게 처리) 및 흑백 처리 
-                    ...(isOwned ? {} : { filter: 'saturate(0) brightness(0.2) opacity(0.4)', userSelect: 'none' })
-                  }}
-                  onError={(e) => {
-                    // 💡 혹시나 아직 public에 이미지를 안 넣었을 때 에러 아이콘 방지용 자동 깨짐 대처
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                {(() => {
+                  const totalExp = characterExpMap[char.id] ?? 0;
+                  const level = calcLevel(totalExp);
+                  const displayId = getDisplayCharacterId(char.id, level);
+                  const displayChar = ALL_CHARACTERS.find((c) => c.id === displayId) ?? char;
+                  return (
+                    <img
+                      src={isOwned ? displayChar.imageUrl : char.imageUrl}
+                      alt={char.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        ...(isOwned ? {} : { filter: 'saturate(0) brightness(0.2) opacity(0.4)', userSelect: 'none' }),
+                      }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  );
+                })()}
 
                 {!isOwned && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 16,
-                      color: 'rgba(255,255,255,0.4)',
-                      fontWeight: 700,
-                    }}
-                  >
+                  <div className="absolute inset-0 flex items-center justify-center text-lg text-foreground/20 font-black">
                     ?
                   </div>
                 )}
               </div>
 
+              {/* Level badge */}
+              {isOwned && (() => {
+                const totalExp = characterExpMap[char.id] ?? 0;
+                const level = calcLevel(totalExp);
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 8,
+                      left: 8,
+                      backgroundColor: 'rgba(0,0,0,0.55)',
+                      color: '#C9A84C',
+                      borderRadius: 8,
+                      padding: '2px 6px',
+                      fontSize: 9,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Lv.{level}
+                  </div>
+                );
+              })()}
+
               {/* Name */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: isOwned ? '#FFFFFF' : 'rgba(255,255,255,0.2)', textAlign: 'center', lineHeight: 1.3 }}>
-                {isOwned ? char.name : '? ? ?'}
+              <div className={cn(
+                "text-[11px] font-bold text-center leading-tight",
+                isOwned ? "text-foreground" : "text-foreground/20"
+              )}>
+                {isOwned ? char.name : '???'}
               </div>
 
               {/* Subject */}
               {isOwned && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+                <div className="text-[9px] text-foreground/35 text-center font-medium">
                   {char.subject}
                 </div>
               )}

@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { type GachaCharacter, GRADE_COLORS, SUBJECT_ICONS } from '@/lib/gachaSystem';
+import { GRADE_COLORS, SUBJECT_ICONS } from '@/constants/characters';
+import { type Character } from '@/types';
+import { cn } from '@/lib/utils';
 
 interface GachaResultModalProps {
   isOpen: boolean;
-  characters: GachaCharacter[];
+  characters: Character[];
   newIds: Set<string>;
   onClose: () => void;
   onViewCollection: () => void;
 }
 
 interface ResultCardProps {
-  character: GachaCharacter;
+  character: Character;
   isNew: boolean;
   revealed: boolean;
   delay: number;
@@ -23,88 +25,54 @@ const ResultCard: React.FC<ResultCardProps> = ({ character, isNew, revealed, del
   const isLarge = size === 'large';
 
   return (
-    <div style={{ perspective: '600px', display: 'inline-block' }}>
+    <div className="[perspective:600px] inline-block">
       <div
-        style={{
-          width: isLarge ? 200 : 110,
-          height: isLarge ? 280 : 150,
-          borderRadius: isLarge ? 16 : 12,
-          backgroundColor: colors.bg,
-          border: `2px solid ${colors.border}`,
-          boxShadow: colors.glow !== 'none' ? `0 0 ${isLarge ? 28 : 16}px ${colors.glow}` : undefined,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: isLarge ? 10 : 6,
-          padding: isLarge ? '16px 12px' : '10px 8px',
-          position: 'relative',
-          transform: revealed ? 'rotateY(0deg)' : 'rotateY(90deg)',
-          transition: `transform 500ms ease-out ${delay}ms`,
+        className={cn(
+          "rounded-2xl flex flex-col items-center justify-center relative transition-transform duration-500 ease-out border-2 shadow-xl",
+          isLarge ? "w-[200px] h-[280px] gap-2.5 p-4" : "w-[110px] h-[150px] gap-1.5 p-2",
+          revealed ? "rotate-y-0" : "[transform:rotateY(90deg)]"
+        )}
+        style={{ 
+          backgroundColor: colors.bg, 
+          borderColor: colors.border,
+          boxShadow: colors.glow !== 'none' ? `0 0 ${isLarge ? 28 : 16}px ${colors.glow}` : 'none',
+          transitionDelay: `${delay}ms`
         }}
       >
         {/* Grade badge */}
         <div
-          style={{
-            position: 'absolute',
-            top: isLarge ? 12 : 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: isLarge ? 18 : 13,
-            fontWeight: 700,
-            color: colors.text,
-          }}
+          className={cn(
+            "absolute left-1/2 -translate-x-1/2 font-black",
+            isLarge ? "top-3 text-lg" : "top-2 text-xs"
+          )}
+          style={{ color: colors.text }}
         >
           {character.grade}
         </div>
 
         {/* NEW badge */}
         {isNew && (
-          <div
-            style={{
-              position: 'absolute',
-              top: isLarge ? 10 : 6,
-              right: isLarge ? 10 : 6,
-              backgroundColor: '#C9A84C',
-              color: '#0F0F1A',
-              fontSize: 10,
-              fontWeight: 700,
-              borderRadius: 10,
-              padding: '2px 7px',
-            }}
-          >
+          <div className={cn(
+            "absolute bg-[#C9A84C] text-[#0F0F1A] font-black rounded-full px-2 py-0.5 z-10",
+            isLarge ? "top-2.5 right-2.5 text-[10px]" : "top-1.5 right-1.5 text-[8px]"
+          )}>
             NEW!
           </div>
         )}
 
         {/* Subject icon avatar */}
-        <div
-          style={{
-            width: isLarge ? 80 : 48,
-            height: isLarge ? 80 : 48,
-            borderRadius: '50%',
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: isLarge ? 36 : 22,
-            marginTop: isLarge ? 24 : 16,
-          }}
-        >
+        <div className={cn(
+          "rounded-full bg-white/5 flex items-center justify-center",
+          isLarge ? "w-20 h-20 text-4xl mt-6" : "w-12 h-12 text-2xl mt-4"
+        )}>
           {icon}
         </div>
 
         {/* Name */}
-        <div
-          style={{
-            fontSize: isLarge ? 14 : 10,
-            fontWeight: 700,
-            color: '#FFFFFF',
-            textAlign: 'center',
-            lineHeight: 1.3,
-            marginTop: 4,
-          }}
-        >
+        <div className={cn(
+          "font-bold text-center leading-tight mt-1 text-white",
+          isLarge ? "text-sm" : "text-[10px]"
+        )}>
           {character.name}
         </div>
       </div>
@@ -151,49 +119,19 @@ const GachaResultModal: React.FC<GachaResultModalProps> = ({
   const isSingle = characters.length === 1;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 250,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: backdropVisible ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0)',
-        transition: 'background-color 300ms ease',
-        padding: '20px 20px calc(40px + env(safe-area-inset-bottom))',
-        overflowY: 'auto',
-      }}
-    >
+    <div className={cn(
+      "fixed inset-0 z-[250] flex flex-col items-center justify-center transition-colors duration-300 px-5 pb-[calc(40px+env(safe-area-inset-bottom))] overflow-y-auto",
+      backdropVisible ? "bg-black/85" : "bg-transparent"
+    )}>
       {/* Flash overlay */}
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'white',
-          opacity: flash ? 0.85 : 0,
-          transition: 'opacity 350ms ease',
-          pointerEvents: 'none',
-          zIndex: 251,
-        }}
-      />
+      <div className={cn(
+        "fixed inset-0 bg-white pointer-events-none z-[251] transition-opacity duration-350",
+        flash ? "opacity-85" : "opacity-0"
+      )} />
 
       {/* Content */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 252,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 24,
-          width: '100%',
-          maxWidth: 390,
-        }}
-      >
+      <div className="relative z-[252] flex flex-col items-center gap-6 w-full max-w-[390px]">
         {isSingle ? (
-          /* Single pull */
           <ResultCard
             character={characters[0]}
             isNew={newIds.has(characters[0].id)}
@@ -202,15 +140,7 @@ const GachaResultModal: React.FC<GachaResultModalProps> = ({
             size="large"
           />
         ) : (
-          /* 10-pull grid — 2 columns */
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 8,
-              width: '100%',
-            }}
-          >
+          <div className="grid grid-cols-4 gap-2 w-full">
             {characters.map((char, i) => (
               <ResultCard
                 key={`${char.id}-${i}`}
@@ -225,45 +155,19 @@ const GachaResultModal: React.FC<GachaResultModalProps> = ({
         )}
 
         {/* Buttons */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 12,
-            opacity: buttonsVisible ? 1 : 0,
-            transform: buttonsVisible ? 'translateY(0)' : 'translateY(12px)',
-            transition: 'opacity 300ms ease, transform 300ms ease',
-          }}
-        >
+        <div className={cn(
+          "flex gap-3 transition-all duration-300",
+          buttonsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+        )}>
           <button
             onClick={onClose}
-            style={{
-              width: 140,
-              height: 48,
-              backgroundColor: 'transparent',
-              border: '1.5px solid #C9A84C',
-              borderRadius: 24,
-              color: '#C9A84C',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="w-[140px] h-[52px] bg-transparent border-2 border-[#C9A84C] rounded-full text-[#C9A84C] text-[15px] font-bold cursor-pointer active:scale-95 transition-transform"
           >
             다시 뽑기
           </button>
           <button
             onClick={onViewCollection}
-            style={{
-              width: 140,
-              height: 48,
-              backgroundColor: '#C9A84C',
-              border: 'none',
-              borderRadius: 24,
-              color: '#0F0F1A',
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 0 20px rgba(201,168,76,0.4)',
-            }}
+            className="w-[140px] h-[52px] bg-[#C9A84C] border-none rounded-full text-[#0F0F1A] text-[15px] font-black cursor-pointer shadow-lg shadow-[#C9A84C]/40 active:scale-95 transition-transform"
           >
             도감 확인
           </button>

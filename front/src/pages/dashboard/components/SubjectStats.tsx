@@ -25,60 +25,41 @@ const SubjectStats: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ background: '#1A1A2E', borderRadius: 16, padding: 20 }}>
-      <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+    <div className="bg-card rounded-2xl p-5 border border-border shadow-lg">
+      <div className="text-foreground text-base font-bold mb-4">
         공부 분야
       </div>
 
-      {SUBJECT_STATS.map((stat, idx) => {
-        const pct = Math.round((stat.minutes / TOTAL) * 100);
-        return (
-          <div
-            key={stat.subject}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: idx < SUBJECT_STATS.length - 1 ? 12 : 0,
-            }}
-          >
-            <span style={{
-              color: '#fff',
-              fontSize: 13,
-              minWidth: 64,
-              flexShrink: 0,
-            }}>
-              {stat.subject}
-            </span>
+      <div className="flex flex-col gap-3">
+        {SUBJECT_STATS.map((stat, idx) => {
+          const pct = Math.round((stat.minutes / TOTAL) * 100);
+          return (
+            <div
+              key={stat.subject}
+              className="flex items-center"
+            >
+              <span className="text-foreground text-[13px] font-medium min-w-[64px] shrink-0">
+                {stat.subject}
+              </span>
 
-            <div style={{
-              flex: 1,
-              height: 8,
-              background: 'rgba(255,255,255,0.06)',
-              borderRadius: 4,
-              margin: '0 12px',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                height: '100%',
-                borderRadius: 4,
-                background: stat.color,
-                width: mounted ? `${pct}%` : '0%',
-                transition: `width 0.8s ease-out ${idx * 0.1}s`,
-              }} />
+              <div className="flex-1 h-2 bg-foreground/5 rounded-full mx-3 overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-800 ease-out"
+                  style={{ 
+                    backgroundColor: stat.color,
+                    width: mounted ? `${pct}%` : '0%',
+                    transitionDelay: `${idx * 100}ms`
+                  }} 
+                />
+              </div>
+
+              <span className="text-foreground/40 text-[11px] font-bold min-w-[36px] text-right shrink-0 tabular-nums">
+                {pct}%
+              </span>
             </div>
-
-            <span style={{
-              color: 'rgba(255,255,255,0.4)',
-              fontSize: 12,
-              minWidth: 36,
-              textAlign: 'right',
-              flexShrink: 0,
-            }}>
-              {pct}%
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };

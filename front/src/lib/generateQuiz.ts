@@ -11,7 +11,8 @@ export type Quiz = {
   hint?: string;
 };
 
-type QuizBank = { question: string; options: string[]; correctIndex: number }[];
+type QuizBankItem = { question: string; options: string[]; correctIndex: number; explanation?: string };
+type QuizBank = QuizBankItem[];
 
 const banks: Record<string, QuizBank> = {
   수학: [

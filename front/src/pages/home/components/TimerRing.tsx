@@ -82,7 +82,7 @@ const TimerRing: React.FC<TimerRingProps> = ({
           cy="130"
           r={RADIUS}
           fill="none"
-          stroke="rgba(255,255,255,0.06)"
+          stroke="hsl(var(--border))"
           strokeWidth="10"
         />
 
@@ -156,7 +156,7 @@ const TimerRing: React.FC<TimerRingProps> = ({
           style={{
             fontSize: 48,
             fontWeight: 700,
-            color: '#FFFFFF',
+            color: 'hsl(var(--foreground))',
             letterSpacing: '-2px',
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
@@ -169,7 +169,7 @@ const TimerRing: React.FC<TimerRingProps> = ({
         <span
           style={{
             fontSize: 12,
-            color: 'rgba(255,255,255,0.35)',
+            color: 'hsl(var(--foreground) / 0.35)',
             letterSpacing: '0.5px',
             animation: isStudying ? 'textPulse 2.5s ease-in-out infinite' : undefined,
           }}

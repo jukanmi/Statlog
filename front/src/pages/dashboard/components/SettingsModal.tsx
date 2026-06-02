@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { User, LogOut, Trash2, ChevronRight, Check, Target } from 'lucide-react';
+import { User, LogOut, Trash2, ChevronRight, Check, Target, Sun, Moon } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 import { useQuestStore } from '@/store/useQuestStore';
+import { cn } from '@/lib/utils';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -11,7 +12,7 @@ interface SettingsModalProps {
 type ConfirmType = 'logout' | 'delete' | null;
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
-  const { user, updateNickname, updateProfileImage, dataCollectionConsent, setConsent } = useUserStore();
+  const { user, updateNickname, updateProfileImage, dataCollectionConsent, setConsent, theme, toggleTheme } = useUserStore();
   const { dailyStudyGoalMinutes, updateDailyStudyGoal } = useQuestStore();
   const [editingNick, setEditingNick] = useState(false);
   const [nickValue, setNickValue] = useState(user.nickname);
@@ -69,7 +70,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            // 압축하여 Base64로 변환 (0.8 품질의 JPEG)
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
             updateProfileImage(compressedBase64);
           }
@@ -92,117 +92,72 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: '#0F0F1A',
-      zIndex: 200,
-      overflowY: 'auto',
-      animation: 'slideInRight 300ms ease',
-    }}>
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to   { transform: translateX(0); }
-        }
-      `}</style>
-
+    <div className="fixed inset-0 bg-background z-[200] overflow-y-auto animate-in slide-in-from-right duration-300">
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '16px 20px',
-        paddingTop: 'calc(env(safe-area-inset-top) + 16px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        position: 'sticky',
-        top: 0,
-        background: '#0F0F1A',
-        zIndex: 1,
-      }}>
+      <div className="flex items-center px-5 py-4 pt-[calc(env(safe-area-inset-top)+16px)] border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <button
           onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#fff',
-            fontSize: 18,
-            fontWeight: 700,
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
+          className="bg-transparent border-none cursor-pointer text-foreground text-lg font-bold p-0 flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          ← 설정
+          <ChevronRight size={24} className="rotate-180" /> 설정
         </button>
       </div>
 
-      <div style={{ padding: '8px 20px 60px' }}>
+      <div className="px-5 pb-16 pt-2">
+        {/* ─── 테마 설정 ─── */}
+        <SectionHeader text="테마" />
+        <SettingRow onClick={toggleTheme}>
+          {theme === 'dark' ? <Moon size={20} className="text-foreground/40" /> : <Sun size={20} className="text-foreground/40" />}
+          <span className="text-foreground text-[15px] font-medium flex-1">테마 모드</span>
+          <span className="text-[#C9A84C] text-[13px] font-bold">
+            {theme === 'dark' ? '다크 모드' : '라이트 모드'}
+          </span>
+        </SettingRow>
+
         {/* ─── 프로필 ─── */}
         <SectionHeader text="프로필" />
 
         {/* Profile image */}
         <SettingRow onClick={() => fileInputRef.current?.click()}>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #7C3AED, #C9A84C)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#C9A84C] flex items-center justify-center overflow-hidden shrink-0 border border-border">
             {user.profileImage ? (
               <img
                 src={user.profileImage}
                 alt="avatar"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover"
               />
             ) : (
-              <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>
+              <span className="text-white text-base font-bold">
                 {user.nickname[0]}
               </span>
             )}
           </div>
-          <span style={{ color: '#fff', fontSize: 15, flex: 1 }}>프로필 사진</span>
-          <span style={{ color: '#C9A84C', fontSize: 13 }}>변경</span>
+          <span className="text-foreground text-[15px] font-medium flex-1">프로필 사진</span>
+          <span className="text-[#C9A84C] text-[13px] font-bold">변경</span>
         </SettingRow>
         <input
           type="file"
           accept="image/*"
           ref={fileInputRef}
-          style={{ display: 'none' }}
+          className="hidden"
           onChange={handleFileChange}
         />
 
         {/* Nickname */}
         <SettingRow onClick={!editingNick ? () => { setNickValue(user.nickname); setEditingNick(true); } : undefined}>
-          <User size={20} color="rgba(255,255,255,0.5)" />
-          <div style={{ flex: 1 }}>
-            <div style={{ color: '#fff', fontSize: 15 }}>닉네임</div>
+          <User size={20} className="text-foreground/40" />
+          <div className="flex-1 min-w-0">
+            <div className="text-foreground text-[15px] font-medium">닉네임</div>
             {editingNick ? (
               <input
                 value={nickValue}
                 onChange={(e) => setNickValue(e.target.value.slice(0, 12))}
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleNickConfirm(); }}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8,
-                  padding: '4px 10px',
-                  color: '#fff',
-                  fontSize: 13,
-                  outline: 'none',
-                  marginTop: 4,
-                  width: '80%',
-                }}
+                className="bg-foreground/5 border border-border rounded-lg px-2.5 py-1 text-foreground text-[13px] outline-none mt-1.5 w-4/5 focus:border-[#C9A84C]/50 transition-colors"
               />
             ) : (
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+              <div className="text-foreground/40 text-[13px] font-medium mt-0.5">
                 {user.nickname}
               </div>
             )}
@@ -210,21 +165,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
           {editingNick ? (
             <button
               onClick={handleNickConfirm}
-              style={{
-                background: 'rgba(201,168,76,0.15)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '6px 10px',
-                cursor: 'pointer',
-                color: '#C9A84C',
-                display: 'flex',
-                alignItems: 'center',
-              }}
+              className="bg-[#C9A84C]/15 border-none rounded-lg p-2 cursor-pointer text-[#C9A84C] flex items-center hover:bg-[#C9A84C]/25 transition-colors"
             >
               <Check size={16} />
             </button>
           ) : (
-            <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+            <ChevronRight size={18} className="text-foreground/20" />
           )}
         </SettingRow>
 
@@ -232,9 +178,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
         <SectionHeader text="목표 설정" />
 
         <SettingRow onClick={!editingGoal ? () => { setGoalValue(dailyStudyGoalMinutes.toString()); setEditingGoal(true); } : undefined}>
-          <Target size={20} color="rgba(255,255,255,0.5)" />
-          <div style={{ flex: 1 }}>
-            <div style={{ color: '#fff', fontSize: 15 }}>일일 퀘스트 학습 목표 (분)</div>
+          <Target size={20} className="text-foreground/40" />
+          <div className="flex-1 min-w-0">
+            <div className="text-foreground text-[15px] font-medium">일일 퀘스트 학습 목표 (분)</div>
             {editingGoal ? (
               <input
                 type="number"
@@ -244,20 +190,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
                 onChange={(e) => setGoalValue(e.target.value)}
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleGoalConfirm(); }}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8,
-                  padding: '4px 10px',
-                  color: '#fff',
-                  fontSize: 13,
-                  outline: 'none',
-                  marginTop: 4,
-                  width: '80px',
-                }}
+                className="bg-foreground/5 border border-border rounded-lg px-2.5 py-1 text-foreground text-[13px] outline-none mt-1.5 w-20 focus:border-[#C9A84C]/50 transition-colors"
               />
             ) : (
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+              <div className="text-foreground/40 text-[13px] font-medium mt-0.5">
                 {dailyStudyGoalMinutes}분
               </div>
             )}
@@ -265,21 +201,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
           {editingGoal ? (
             <button
               onClick={handleGoalConfirm}
-              style={{
-                background: 'rgba(201,168,76,0.15)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '6px 10px',
-                cursor: 'pointer',
-                color: '#C9A84C',
-                display: 'flex',
-                alignItems: 'center',
-              }}
+              className="bg-[#C9A84C]/15 border-none rounded-lg p-2 cursor-pointer text-[#C9A84C] flex items-center hover:bg-[#C9A84C]/25 transition-colors"
             >
               <Check size={16} />
             </button>
           ) : (
-            <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
+            <ChevronRight size={18} className="text-foreground/20" />
           )}
         </SettingRow>
 
@@ -287,18 +214,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
         <SectionHeader text="개인정보" />
 
         <SettingRow>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: '#fff', fontSize: 15 }}>익명 데이터 수집 동의</div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+          <div className="flex-1 min-w-0">
+            <div className="text-foreground text-[15px] font-medium">익명 데이터 수집 동의</div>
+            <div className="text-foreground/40 text-[12px] font-medium mt-0.5 leading-relaxed">
               앱 개선을 위한 학습 통계(과목, 시간) 수집에 동의합니다.
             </div>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+          <label className="flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={dataCollectionConsent || false}
               onChange={(e) => setConsent(e.target.checked)}
-              style={{ width: 18, height: 18, accentColor: '#C9A84C' }}
+              className="w-5 h-5 accent-[#C9A84C] cursor-pointer"
             />
           </label>
         </SettingRow>
@@ -307,92 +234,46 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
         <SectionHeader text="계정" />
 
         <SettingRow onClick={() => setConfirmType('logout')}>
-          <LogOut size={20} color="#EF4444" />
-          <span style={{ color: '#EF4444', fontSize: 15, flex: 1 }}>로그아웃</span>
+          <LogOut size={20} className="text-red-500" />
+          <span className="text-red-500 text-[15px] font-bold flex-1">로그아웃</span>
         </SettingRow>
 
         <SettingRow onClick={() => setConfirmType('delete')}>
-          <Trash2 size={20} color="#EF4444" />
-          <span style={{ color: '#EF4444', fontSize: 15, flex: 1 }}>회원탈퇴</span>
+          <Trash2 size={20} className="text-red-500" />
+          <span className="text-red-500 text-[15px] font-bold flex-1">회원탈퇴</span>
         </SettingRow>
 
         {/* ─── 정보 ─── */}
         <SectionHeader text="정보" />
 
         <SettingRow>
-          <span style={{ color: '#fff', fontSize: 15, flex: 1 }}>버전</span>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>v1.0.0</span>
+          <span className="text-foreground text-[15px] font-medium flex-1">버전</span>
+          <span className="text-foreground/30 text-[13px] font-bold tracking-tight uppercase">v1.0.0</span>
         </SettingRow>
       </div>
 
       {/* Confirm modal */}
       {confirmType !== null && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.72)',
-          zIndex: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 20px',
-        }}>
-          <div style={{
-            background: '#1A1A2E',
-            borderRadius: 20,
-            padding: 28,
-            border: '1px solid rgba(255,255,255,0.08)',
-            maxWidth: 320,
-            width: '100%',
-          }}>
-            <div style={{
-              color: '#fff',
-              fontSize: 18,
-              fontWeight: 700,
-              textAlign: 'center',
-              marginBottom: 8,
-            }}>
+        <div className="fixed inset-0 bg-black/75 z-20 flex items-center justify-center px-5 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[24px] p-7 border border-border max-w-[320px] w-full shadow-2xl scale-in-center">
+            <div className="text-foreground text-lg font-black text-center mb-2">
               {confirmType === 'logout' ? '로그아웃 하시겠어요?' : '정말 탈퇴하시겠어요?'}
             </div>
             {confirmType === 'delete' && (
-              <div style={{
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: 13,
-                textAlign: 'center',
-                marginBottom: 8,
-              }}>
+              <div className="text-foreground/40 text-[13px] font-medium text-center mb-2">
                 모든 데이터가 삭제됩니다
               </div>
             )}
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setConfirmType(null)}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
-                  fontSize: 14,
-                }}
+                className="flex-1 h-12 rounded-xl cursor-pointer border border-border bg-foreground/5 text-foreground text-sm font-bold hover:bg-foreground/10 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleConfirmAction}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'rgba(239,68,68,0.15)',
-                  color: '#EF4444',
-                  fontSize: 14,
-                  fontWeight: 700,
-                }}
+                className="flex-1 h-12 rounded-xl cursor-pointer border-none bg-red-500/15 text-red-500 text-sm font-black hover:bg-red-500/25 transition-colors"
               >
                 {confirmType === 'logout' ? '로그아웃' : '탈퇴하기'}
               </button>
@@ -408,14 +289,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onLogout }) => {
 
 function SectionHeader({ text }: { text: string }) {
   return (
-    <div style={{
-      color: 'rgba(255,255,255,0.4)',
-      fontSize: 12,
-      fontWeight: 600,
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      margin: '20px 0 8px',
-    }}>
+    <div className="text-foreground/30 text-[11px] font-black tracking-[0.1em] uppercase mt-6 mb-2 ml-1">
       {text}
     </div>
   );
@@ -430,16 +304,10 @@ function SettingRow({ children, onClick }: SettingRowProps) {
   return (
     <div
       onClick={onClick}
-      style={{
-        background: '#1A1A2E',
-        borderRadius: 12,
-        padding: '14px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 8,
-        cursor: onClick ? 'pointer' : 'default',
-      }}
+      className={cn(
+        "bg-card rounded-[14px] p-4 flex items-center gap-3.5 mb-2 border border-border transition-all duration-200",
+        onClick ? "cursor-pointer active:scale-[0.98] active:opacity-80" : "cursor-default"
+      )}
     >
       {children}
     </div>
