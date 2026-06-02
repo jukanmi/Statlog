@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { generateQuiz } from '@/lib/api';
 import { getQuizBySubject, type Quiz } from '@/lib/generateQuiz';
 import { useStudyStore } from '@/store/useStudyStore';
+import { useQuizStore, REPORT_HIDE_THRESHOLD } from '@/store/useQuizStore';
 import QuizReportModal from './QuizReportModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getRandomTip } from '@/constants/studyTips';
@@ -165,6 +166,7 @@ const QuizSkeleton = ({ currentTip }: { currentTip: string }) => {
 
 const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, onSkip }) => {
   const lastSessionQuiz = useStudyStore((s) => s.lastSessionQuiz);
+  const { reportQuiz, reportedByMe, reportCounts } = useQuizStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [correctResults, setCorrectResults] = useState<boolean[]>([]);
@@ -187,8 +189,23 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   };
 
   const handleReportSubmit = (reason: string) => {
-    console.log('Quiz reported:', { reason });
-    showToast('신고가 접수되었습니다');
+    const currentQuiz = quizzes?.[currentIndex];
+    if (!currentQuiz) return;
+
+    if (reportedByMe.includes(currentQuiz.id)) {
+      showToast('이미 신고한 퀴즈예요');
+      return;
+    }
+
+    console.log('Quiz reported (Screen):', { quizId: currentQuiz.id, reason });
+    reportQuiz(currentQuiz.id);
+
+    const newCount = (reportCounts[currentQuiz.id] ?? 0) + 1;
+    if (newCount >= REPORT_HIDE_THRESHOLD) {
+      showToast('신고가 접수됐어요. 문제가 숨겨졌어요');
+    } else {
+      showToast('신고가 접수되었습니다');
+    }
   };
 
   // TanStack Query로 퀴즈 데이터 관리
