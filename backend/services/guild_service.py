@@ -103,7 +103,7 @@ def join_guild(db: Session, user: User, guild_id: str) -> GuildDetailResponse:
     if get_user_guild(db, user.id):
         raise ValueError("USER_ALREADY_IN_GUILD")
 
-    guild = db.query(Guild).filter_by(id=guild_id).first()
+    guild = db.query(Guild).filter_by(id=guild_id).with_for_update().first()
     if not guild:
         raise ValueError("GUILD_NOT_FOUND")
 
