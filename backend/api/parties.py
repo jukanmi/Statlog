@@ -5,8 +5,10 @@ from api.users import get_current_user
 from models.user import User
 from core.db import get_db
 from schemas.party import (
-    PartyCreate, PartyResponse, PartyInviteCreate, PartyInviteResponse
+    PartyCreate, PartyResponse, PartyInviteCreate, PartyInviteResponse,
+    PartyMemberDetailResponse
 )
+from typing import List
 from services import party_service
 
 router = APIRouter(tags=["Parties"])
@@ -16,13 +18,13 @@ def get_my_party(db: Session = Depends(get_db), current_user: User = Depends(get
     party = party_service.get_user_active_party(db, user_id=current_user.id)
     if not party:
         raise HTTPException(status_code=404, detail="가입한 파티가 없습니다.")
-    return party
+    return party_service.serialize_party(db, party)
 
 @router.post("/parties", response_model=PartyResponse)
 def create_party(body: PartyCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.create_party(db, user=current_user, name=body.name, max_member_count=body.max_member_count)
-        return party
+        return party_service.serialize_party(db, party)
     except ValueError as e:
         if str(e) == "USER_ALREADY_IN_ACTIVE_PARTY":
             raise HTTPException(status_code=409, detail="이미 다른 활성 파티에 참여중입니다.")
@@ -32,7 +34,7 @@ def create_party(body: PartyCreate, db: Session = Depends(get_db), current_user:
 def join_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.join_party(db, user=current_user, party_id=party_id)
-        return party
+        return party_service.serialize_party(db, party)
     except ValueError as e:
         error_map = {
             "PARTY_NOT_FOUND": (404, "파티를 찾을 수 없습니다."),
@@ -48,7 +50,7 @@ def get_party(party_id: str, db: Session = Depends(get_db), current_user: User =
     party = party_service.get_party(db, party_id=party_id)
     if not party:
         raise HTTPException(status_code=404, detail="파티를 찾을 수 없습니다.")
-    return party
+    return party_service.serialize_party(db, party)
 
 @router.delete("/parties/{party_id}/members/me", status_code=204)
 def leave_party(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -71,6 +73,14 @@ def create_invite(party_id: str, body: PartyInviteCreate, db: Session = Depends(
             raise HTTPException(status_code=403, detail="초대 링크는 파티장만 생성할 수 있습니다.")
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/parties/{party_id}/members", response_model=List[PartyMemberDetailResponse])
+def get_party_members(party_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    party = party_service.get_party(db, party_id=party_id)
+    if not party:
+        raise HTTPException(status_code=404, detail="파티를 찾을 수 없습니다.")
+    return party_service.get_party_members_detail(db, party_id=party_id)
+
+
 @router.get("/party-invites/{invite_code}", response_model=PartyInviteResponse)
 def get_invite(invite_code: str, db: Session = Depends(get_db)):
     invite = party_service.get_invite(db, invite_code=invite_code)
@@ -82,7 +92,7 @@ def get_invite(invite_code: str, db: Session = Depends(get_db)):
 def join_party_by_invite(invite_code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         party = party_service.join_party_by_invite(db, user=current_user, invite_code=invite_code)
-        return party
+        return party_service.serialize_party(db, party)
     except ValueError as e:
         error_map = {
             "INVITE_EXPIRED_OR_INVALID": (400, "초대 코드가 만료되었거나 유효하지 않습니다."),

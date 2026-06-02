@@ -33,16 +33,25 @@ export interface GuildMember {
   grade: 'guild_master' | 'officer' | 'member';
 }
 
+export interface PartyMember {
+  id: string;
+  nickname: string;
+  weeklyMinutes: number;
+  role: 'LEADER' | 'MEMBER';
+}
+
 interface SocialState {
   parties: Party[];
   currentParty: Party | null;
   currentPartyId: string | null;
+  currentPartyMembers: PartyMember[];
   guilds: Guild[];
   currentGuildId: string | null;
   currentGuildMembers: GuildMember[];
   pollingIntervalId: number | null;
 
   loadMyParty: () => Promise<void>;
+  loadPartyMembers: (partyId: string) => Promise<void>;
   createParty: (partyInput: { name: string; description: string; maxMembers: number; weeklyMinutes: number; tags: string[] }) => Promise<void>;
   joinParty: (id: string) => Promise<void>;
   joinPartyByInvite: (inviteCode: string) => Promise<void>;
@@ -65,6 +74,7 @@ export const useSocialStore = create<SocialState>()(
       parties: [],
       currentParty: null,
       currentPartyId: null,
+      currentPartyMembers: [],
       guilds: [],
       currentGuildId: null,
       currentGuildMembers: [],
@@ -90,13 +100,34 @@ export const useSocialStore = create<SocialState>()(
               parties: [mappedParty]
             });
             get().startPollingPartyProgress();
+            get().loadPartyMembers(serverParty.id);
           } else {
-            set({ currentPartyId: null, currentParty: null });
+            set({ currentPartyId: null, currentParty: null, currentPartyMembers: [] });
             get().stopPollingPartyProgress();
           }
         } catch {
-          set({ currentPartyId: null, currentParty: null });
+          set({ currentPartyId: null, currentParty: null, currentPartyMembers: [] });
         }
+      },
+
+      loadPartyMembers: async (partyId: string) => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/parties/${partyId}/members`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          set({
+            currentPartyMembers: data.map((m: any) => ({
+              id: m.user_id,
+              nickname: m.nickname,
+              weeklyMinutes: m.weekly_minutes,
+              role: m.role,
+            })),
+          });
+        } catch (e) { console.error('파티 멤버 로드 실패:', e); }
       },
 
       createParty: async (partyInput) => {
@@ -119,6 +150,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [newParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { alert(e.message || '파티 생성 실패'); }
       },
 
@@ -151,6 +183,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [mappedParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { alert(e.message); throw e; }
       },
 
@@ -173,6 +206,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [mappedParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { throw e; }
       },
 
@@ -207,6 +241,7 @@ export const useSocialStore = create<SocialState>()(
                   weeklyMinutes: serverParty.weekly_minutes || get().currentParty!.weeklyMinutes,
                 }
               });
+              get().loadPartyMembers(partyId);
             }
           } catch { console.warn('폴링 동기화 실패'); }
         }, 10000);
@@ -356,8 +391,9 @@ export const useSocialStore = create<SocialState>()(
       name: 'social-store', 
       partialize: (state) => ({ 
         parties: state.parties,
-        currentPartyId: state.currentPartyId, 
-        currentParty: state.currentParty, 
+        currentPartyId: state.currentPartyId,
+        currentParty: state.currentParty,
+        currentPartyMembers: state.currentPartyMembers,
         guilds: state.guilds,
         currentGuildId: state.currentGuildId,
         currentGuildMembers: state.currentGuildMembers

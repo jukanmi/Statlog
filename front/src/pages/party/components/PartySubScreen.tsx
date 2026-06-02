@@ -10,12 +10,6 @@ import { cn } from '@/lib/utils';
 const PARTY_TAGS = ['수학', '영어', '과학', '국어', '사회', '프로그래밍', '기타'];
 const MAX_OPTIONS = [2, 3, 4, 5, 6, 8];
 
-const MOCK_MEMBERS = [
-  { id: 'user-001', nickname: '탐험가', weeklyMinutes: 340 },
-  { id: 'm2', nickname: '새벽별', weeklyMinutes: 280 },
-  { id: 'm3', nickname: '코딩왕', weeklyMinutes: 210 },
-  { id: 'm4', nickname: '독서가', weeklyMinutes: 185 },
-];
 
 interface QuestReward {
   gold: number;
@@ -34,7 +28,7 @@ type View = 'list' | 'detail';
 
 const PartySubScreen: React.FC = () => {
   const { user, updateCurrency, addStats } = useUserStore();
-  const { parties, currentPartyId, joinParty, leaveParty, createParty } = useSocialStore();
+  const { parties, currentPartyId, currentPartyMembers, joinParty, leaveParty, createParty } = useSocialStore();
   const [view, setView] = useState<View>(currentPartyId ? 'detail' : 'list');
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -109,7 +103,7 @@ const PartySubScreen: React.FC = () => {
       ) : currentParty ? (
         <PartyDetail
           party={currentParty}
-          members={MOCK_MEMBERS}
+          members={currentPartyMembers}
           onBack={() => setView('list')}
           onLeaveClick={() => setConfirmLeave(true)}
           onClaimQuest={handleClaimQuest}
