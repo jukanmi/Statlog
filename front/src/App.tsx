@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
 import AuthCallback from './pages/auth/AuthCallback';
@@ -138,6 +138,9 @@ const App: React.FC = () => {
             });
           }
 
+          if ((userData.last_attendance_date ?? null) !== today) {
+            setShowAttendance(true);
+          }
           login();
         } catch (error) {
           console.error('Failed to validate token:', error);
@@ -156,14 +159,16 @@ const App: React.FC = () => {
     initializeAuth();
   }, []);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = useCallback(() => {
     login();
     const today = new Date().toLocaleDateString('en-CA');
-    if (lastAttendanceDate !== today) {
+    // 스토어에서 직접 읽어 stale closure 방지
+    const currentAttendanceDate = useUserStore.getState().lastAttendanceDate;
+    if (currentAttendanceDate !== today) {
       setShowAttendance(true);
     }
     navigate('/home', { replace: true });
-  };
+  }, [login, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -178,10 +183,9 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const handleAuthSuccess = () => handleLoginSuccess();
-    window.addEventListener('auth_success', handleAuthSuccess);
-    return () => window.removeEventListener('auth_success', handleAuthSuccess);
-  }, []);
+    window.addEventListener('auth_success', handleLoginSuccess);
+    return () => window.removeEventListener('auth_success', handleLoginSuccess);
+  }, [handleLoginSuccess]);
 
   if (isInitializing) {
     return (

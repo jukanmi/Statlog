@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUserStore } from '../../store/useUserStore';
 import { apiClient } from '../../lib/apiClient';
+// navigate와 login()은 App.tsx의 handleLoginSuccess가 auth_success 이벤트 수신 후 처리
 
 interface AuthResponse {
   access_token: string;
@@ -35,11 +36,9 @@ const AuthCallback = () => {
           }
           if (data.user) {
             useUserStore.getState().updateNickname(data.user.nickname);
-            // 필요에 따라 다른 유저 정보 업데이트
           }
-          
-          useUserStore.getState().login();
-          navigate('/home', { replace: true });
+          // App.tsx의 handleLoginSuccess가 login() + 출석 체크 + navigate 처리
+          window.dispatchEvent(new Event('auth_success'));
         })
         .catch((err) => {
           console.error(err);
@@ -48,7 +47,7 @@ const AuthCallback = () => {
     } else {
       setError('인증 코드가 없습니다.');
     }
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   if (error) {
     return (
