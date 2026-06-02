@@ -31,6 +31,10 @@ const GuildSubScreen: React.FC = () => {
     loadMyGuild();
   }, []);
   const [view, setView] = useState<View>(currentGuildId ? 'detail' : 'list');
+
+  useEffect(() => {
+    setView(currentGuildId ? 'detail' : 'list');
+  }, [currentGuildId]);
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [guildTab, setGuildTab] = useState<GuildTab>('home');
