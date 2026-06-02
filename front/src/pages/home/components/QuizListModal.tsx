@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuizStore, OFFICIAL_UPVOTE_THRESHOLD } from '@/store/useQuizStore';
 import type { UserQuiz } from '@/types';
-import { deleteQuizFromServer, voteQuizOnServer, reportQuizOnServer } from '@/lib/api';
+import { deleteQuizFromServer } from '@/lib/api';
 import QuizReportModal from './QuizReportModal';
 
 const SUBJECT_COLORS: Record<string, string> = {
@@ -83,9 +83,8 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
 
   const handleVote = (quiz: UserQuiz, type: 'up' | 'down') => {
     const prevVote = userVotes[quiz.id];
-    voteQuiz(quiz.id, type);
+    voteQuiz(quiz.id, type); // store 내부에서 voteQuizOnServer 호출
     if (prevVote === type) return;
-    voteQuizOnServer(quiz.id, type);
 
     const upCount = (upvotes[quiz.id] ?? 0) + (type === 'up' ? 1 : 0);
     if (type === 'up' && upCount >= OFFICIAL_UPVOTE_THRESHOLD && !officialIds.includes(quiz.id)) {
@@ -108,8 +107,7 @@ const QuizListModal: React.FC<QuizListModalProps> = ({ isOpen, onClose }) => {
     if (!reportingQuizId) return;
 
     console.log('Quiz reported (List):', { quizId: reportingQuizId, reason });
-    reportQuiz(reportingQuizId);
-    reportQuizOnServer(reportingQuizId);
+    reportQuiz(reportingQuizId); // store 내부에서 reportQuizOnServer 호출
 
     const newCount = (reportCounts[reportingQuizId] ?? 0) + 1;
     if (newCount >= 3) {
