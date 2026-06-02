@@ -179,6 +179,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const correctCount = useMemo(() => correctResults.filter(Boolean).length, [correctResults]);
+  const TOTAL = quizzes?.length || 0;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
