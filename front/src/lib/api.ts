@@ -1,6 +1,8 @@
 import { apiClient } from './apiClient';
 import type { Stats, AIStats } from '@/types';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
 // 백엔드 StatResponse: 6대 능력치 + EXP
 export interface StatConversionResult extends Stats {
   EXP: number;

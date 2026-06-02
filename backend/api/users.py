@@ -28,7 +28,7 @@ _PORTFOLIO_RECENT_SESSIONS = 15
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/dev-login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/kakao/callback", auto_error=False)
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:

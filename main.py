@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import auth, users, analytics, quizzes
 from api.users import get_current_user
 from services.oauth import close_http_client
-from api import parties, avatars
+from api import parties, avatars, guilds
 from core.db import Base, engine, get_db
 import models.user
 import models.oauth_account
@@ -71,6 +71,7 @@ app.include_router(parties.router, prefix="/api/v1")
 app.include_router(avatars.router, prefix="/api/v1")
 app.include_router(quizzes.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(guilds.router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 
 
