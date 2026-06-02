@@ -35,23 +35,6 @@ def get_user_by_id(db: Session, user_id: str) -> User | None:
     return db.query(User).filter_by(id=user_id).first()
 
 
-async def get_mock_user_by_id(user_id: str):
-    """실제 DB 연동 전까지 사용할 가짜 유저 조회 함수"""
-    # dummy user object
-    class DummyUser:
-        def __init__(self):
-            self.id = user_id
-            self.nickname = "탐험가"
-            self.email = "test@example.com"
-            self.profile_image = None
-            self.stats = {"HUM": 50, "SOC": 0, "NAT": 10, "COL": 0, "PER": 0, "ART": 0}
-            self.gold = 1000
-            self.gems = 50
-            self.level = 1
-            self.exp = 0
-
-    return DummyUser()
-
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

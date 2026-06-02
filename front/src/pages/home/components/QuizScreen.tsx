@@ -310,8 +310,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ subject, content, onComplete, o
     return <QuizSkeleton currentTip={currentTip} />;
   }
 
-  // 여기서부터 quizzes 보장됨
-  const TOTAL = quizzes.length;
+  // 여기서부터 quizzes 보장됨 (TOTAL은 line 184에서 선언됨)
   const quiz = quizzes[currentIndex];
 
   const handleSelect = (optionIndex: number) => {

@@ -260,3 +260,4 @@ dev-dist
 test_*.py
 
 #documentation
+.gstack/
