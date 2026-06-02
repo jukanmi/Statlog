@@ -41,8 +41,8 @@ function buildMonthData(sessions: { date: string; durationMinutes: number }[], s
 
 function getMondayStr(dateStr: string): string {
   const d = new Date(dateStr);
-  const day = d.getDay();
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
   return d.toISOString().slice(0, 10);
 }
 
