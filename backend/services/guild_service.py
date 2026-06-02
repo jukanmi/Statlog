@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from models.guild import Guild, GuildMember, GuildGrade
 from models.user import User
@@ -11,38 +11,32 @@ from models.study_session import StudySession
 from schemas.guild import GuildMemberResponse, GuildResponse, GuildDetailResponse
 
 
-def _week_start() -> datetime:
+def _week_start_date():
     today = datetime.now(timezone.utc).date()
-    monday = today - timedelta(days=today.weekday())
-    return datetime.combine(monday, datetime.min.time()).replace(tzinfo=timezone.utc)
+    return today - timedelta(days=today.weekday())
 
 
-def _member_minutes(db: Session, user_id: str) -> tuple[int, int]:
-    """(weekly_minutes, total_minutes)"""
-    week_start = _week_start()
-    weekly = db.query(func.coalesce(func.sum(StudySession.duration_minutes), 0)).filter(
-        StudySession.user_id == user_id,
-        StudySession.date >= week_start.date(),
-    ).scalar() or 0
-
-    total = db.query(func.coalesce(func.sum(StudySession.duration_minutes), 0)).filter(
-        StudySession.user_id == user_id,
-    ).scalar() or 0
-
-    return int(weekly), int(total)
-
-
-def _serialize_member(db: Session, gm: GuildMember) -> GuildMemberResponse:
-    user = db.query(User).filter_by(id=gm.user_id).first()
-    weekly, total = _member_minutes(db, gm.user_id)
-    return GuildMemberResponse(
-        user_id=gm.user_id,
-        nickname=user.nickname if user else "알 수 없음",
-        grade=gm.grade,
-        joined_at=gm.joined_at,
-        weekly_minutes=weekly,
-        total_minutes=total,
+def _bulk_member_minutes(db: Session, user_ids: list[str]) -> dict[str, tuple[int, int]]:
+    """user_id → (weekly_minutes, total_minutes) 단일 쿼리로 일괄 조회."""
+    if not user_ids:
+        return {}
+    week_start = _week_start_date()
+    rows = (
+        db.query(
+            StudySession.user_id,
+            func.coalesce(func.sum(
+                case((StudySession.date >= week_start, StudySession.duration_minutes), else_=0)
+            ), 0).label("weekly"),
+            func.coalesce(func.sum(StudySession.duration_minutes), 0).label("total"),
+        )
+        .filter(StudySession.user_id.in_(user_ids))
+        .group_by(StudySession.user_id)
+        .all()
     )
+    result = {uid: (0, 0) for uid in user_ids}
+    for row in rows:
+        result[row.user_id] = (int(row.weekly), int(row.total))
+    return result
 
 
 def _serialize_guild(db: Session, guild: Guild, include_members: bool = False):
@@ -60,9 +54,28 @@ def _serialize_guild(db: Session, guild: Guild, include_members: bool = False):
     if not include_members:
         return base
 
-    members_db = db.query(GuildMember).filter_by(guild_id=guild.id).all()
+    # 단일 JOIN 쿼리로 멤버 + 유저 정보 일괄 조회
+    rows = (
+        db.query(GuildMember, User)
+        .join(User, GuildMember.user_id == User.id)
+        .filter(GuildMember.guild_id == guild.id)
+        .all()
+    )
+    user_ids = [gm.user_id for gm, _ in rows]
+    minutes_map = _bulk_member_minutes(db, user_ids)
+
     members = sorted(
-        [_serialize_member(db, m) for m in members_db],
+        [
+            GuildMemberResponse(
+                user_id=gm.user_id,
+                nickname=user.nickname,
+                grade=gm.grade,
+                joined_at=gm.joined_at,
+                weekly_minutes=minutes_map[gm.user_id][0],
+                total_minutes=minutes_map[gm.user_id][1],
+            )
+            for gm, user in rows
+        ],
         key=lambda m: m.weekly_minutes,
         reverse=True,
     )
@@ -103,7 +116,7 @@ def join_guild(db: Session, user: User, guild_id: str) -> GuildDetailResponse:
     if get_user_guild(db, user.id):
         raise ValueError("USER_ALREADY_IN_GUILD")
 
-    guild = db.query(Guild).filter_by(id=guild_id).with_for_update().first()
+    guild = db.query(Guild).filter_by(id=guild_id).first()
     if not guild:
         raise ValueError("GUILD_NOT_FOUND")
 
