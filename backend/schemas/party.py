@@ -15,11 +15,19 @@ class PartyMemberResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PartyMemberDetailResponse(BaseModel):
+    user_id: str
+    nickname: str
+    weekly_minutes: int
+    role: PartyRole
+
 class PartyResponse(BaseModel):
     id: str
     name: str
     leader_user_id: str
     max_member_count: int
+    member_count: int = 0
+    weekly_minutes: int = 0
     status: PartyStatus
     members: List[PartyMemberResponse]
     created_at: datetime

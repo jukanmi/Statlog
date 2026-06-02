@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     # 서비스 기본 URL
     BACKEND_BASE_URL: str = "http://localhost:8000"
-    FRONTEND_BASE_URL: str = "http://localhost:5173"
+    FRONTEND_BASE_URL: str = "http://localhost:8080"
 
     # Database 설정
     DATABASE_URL: str = "sqlite:///./statlog.db"

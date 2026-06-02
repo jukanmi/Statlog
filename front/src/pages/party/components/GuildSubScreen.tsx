@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useSocialStore } from '@/store/useSocialStore';
@@ -10,13 +10,6 @@ import { cn } from '@/lib/utils';
 
 const MAX_OPTIONS = [10, 15, 20, 25, 30];
 
-const MOCK_GUILD_MEMBERS: GuildMember[] = [
-  { id: 'user-001', nickname: '탐험가', weeklyMinutes: 340, totalMinutes: 12400, grade: 'guild_master' },
-  { id: 'm2', nickname: '새벽별', weeklyMinutes: 280, totalMinutes: 8900, grade: 'officer' },
-  { id: 'm3', nickname: '코딩왕', weeklyMinutes: 210, totalMinutes: 6700, grade: 'member' },
-  { id: 'm4', nickname: '독서가', weeklyMinutes: 185, totalMinutes: 5200, grade: 'member' },
-  { id: 'm5', nickname: '야간탐험가', weeklyMinutes: 160, totalMinutes: 4100, grade: 'member' },
-];
 
 type GuildTab = 'home' | 'ranking' | 'rewards';
 type View = 'list' | 'detail';
@@ -30,9 +23,18 @@ const WEEKLY_REWARDS = [
 
 const GuildSubScreen: React.FC = () => {
   const { user, updateCurrency } = useUserStore();
-  const { guilds, currentGuildId, joinGuild, leaveGuild, createGuild } = useSocialStore();
+  const { guilds, currentGuildId, currentGuildMembers, joinGuild, leaveGuild, createGuild, loadGuilds, loadMyGuild } = useSocialStore();
   const actualWeeklyMinutes = useStudyStore((s) => s.weeklyMinutes);
+
+  useEffect(() => {
+    loadGuilds();
+    loadMyGuild();
+  }, []);
   const [view, setView] = useState<View>(currentGuildId ? 'detail' : 'list');
+
+  useEffect(() => {
+    setView(currentGuildId ? 'detail' : 'list');
+  }, [currentGuildId]);
   const [showModal, setShowModal] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [guildTab, setGuildTab] = useState<GuildTab>('home');
@@ -52,28 +54,34 @@ const GuildSubScreen: React.FC = () => {
 
   const currentGuild = currentGuildId ? guilds.find((g) => g.id === currentGuildId) : null;
 
-  const handleJoin = (id: string) => {
+  const handleJoin = async (id: string) => {
     if (currentGuildId) { showToast('먼저 현재 길드에서 탈퇴하세요'); return; }
-    joinGuild(id);
-    setView('detail');
-    showToast('길드에 가입했어요! 🏰');
+    try {
+      await joinGuild(id);
+      setView('detail');
+      showToast('길드에 가입했어요! 🏰');
+    } catch { /* alert은 store에서 처리 */ }
   };
 
-  const handleLeave = () => {
-    leaveGuild();
-    setConfirmLeave(false);
-    setGuildTab('home');
-    setView('list');
-    showToast('길드를 탈퇴했어요');
+  const handleLeave = async () => {
+    try {
+      await leaveGuild();
+      setConfirmLeave(false);
+      setGuildTab('home');
+      setView('list');
+      showToast('길드를 탈퇴했어요');
+    } catch { /* alert은 store에서 처리 */ }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!cName.trim()) return;
-    createGuild({ name: cName.trim(), description: cDesc.trim(), maxMembers: cMax, weeklyMinutes: 0, level: 1 });
-    setShowModal(false);
-    setCName(''); setCDesc(''); setCMax(20);
-    setView('detail');
-    showToast('길드가 생성되었어요! 🏰');
+    try {
+      await createGuild({ name: cName.trim(), description: cDesc.trim(), maxMembers: cMax });
+      setShowModal(false);
+      setCName(''); setCDesc(''); setCMax(20);
+      setView('detail');
+      showToast('길드가 생성되었어요! 🏰');
+    } catch { /* alert은 store에서 처리 */ }
   };
 
   const handleClaimReward = (rewardId: string) => {
@@ -101,7 +109,7 @@ const GuildSubScreen: React.FC = () => {
       ) : currentGuild ? (
         <GuildDetail
           guild={currentGuild}
-          members={MOCK_GUILD_MEMBERS}
+          members={currentGuildMembers}
           onBack={() => setView('list')}
           onLeaveClick={() => setConfirmLeave(true)}
           activeTab={guildTab}

@@ -1,12 +1,36 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 
 from models import party as party_models
 from models.user import User
+from models.study_session import StudySession
 from schemas import party as party_schemas
+
+
+def _party_weekly_minutes(db: Session, party: party_models.Party) -> int:
+    from datetime import date
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    member_ids = [m.user_id for m in party.members]
+    if not member_ids:
+        return 0
+    total = db.query(func.coalesce(func.sum(StudySession.duration_minutes), 0)).filter(
+        StudySession.user_id.in_(member_ids),
+        StudySession.date >= week_start,
+    ).scalar() or 0
+    return int(total)
+
+
+def serialize_party(db: Session, party: party_models.Party) -> party_schemas.PartyResponse:
+    weekly = _party_weekly_minutes(db, party)
+    data = party_schemas.PartyResponse.model_validate(party)
+    data.member_count = len(party.members)
+    data.weekly_minutes = weekly
+    return data
 
 
 def get_user_active_party(db: Session, user_id: str) -> Optional[party_models.Party]:
@@ -148,5 +172,30 @@ def join_party_by_invite(db: Session, user: User, invite_code: str) -> party_mod
         db.commit()
         return party
     except ValueError as e:
-        # join_party에서 발생하는 예외를 그대로 전달
         raise e
+
+
+def _week_start_date():
+    from datetime import date
+    today = date.today()
+    return today - timedelta(days=today.weekday())
+
+
+def get_party_members_detail(db: Session, party_id: str) -> List[party_schemas.PartyMemberDetailResponse]:
+    """파티 멤버 목록 + nickname + 이번주 학습분 반환."""
+    members = db.query(party_models.PartyMember).filter_by(party_id=party_id).all()
+    week_start = _week_start_date()
+    result = []
+    for m in members:
+        user = db.query(User).filter_by(id=m.user_id).first()
+        weekly = db.query(func.coalesce(func.sum(StudySession.duration_minutes), 0)).filter(
+            StudySession.user_id == m.user_id,
+            StudySession.date >= week_start,
+        ).scalar() or 0
+        result.append(party_schemas.PartyMemberDetailResponse(
+            user_id=m.user_id,
+            nickname=user.nickname if user else "알 수 없음",
+            weekly_minutes=int(weekly),
+            role=m.role,
+        ))
+    return sorted(result, key=lambda x: x.weekly_minutes, reverse=True)

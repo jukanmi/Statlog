@@ -25,22 +25,33 @@ export interface Guild {
   isJoined: boolean;
 }
 
-const MOCK_GUILDS: Guild[] = [
-  { id: 'g1', name: '공부의 신전', description: '최고를 향해 달려가는 길드', memberCount: 18, maxMembers: 30, weeklyMinutes: 12400, level: 8, isJoined: false },
-  { id: 'g2', name: '새벽별 학당', description: '꾸준함이 실력이다', memberCount: 12, maxMembers: 20, weeklyMinutes: 7200, level: 5, isJoined: false },
-  { id: 'g3', name: '지식탐험대', description: '모든 분야를 탐구합니다', memberCount: 25, maxMembers: 30, weeklyMinutes: 9800, level: 7, isJoined: false },
-  { id: 'g4', name: '입문자의 전당', description: '처음 시작하는 분 환영해요', memberCount: 8, maxMembers: 30, weeklyMinutes: 3100, level: 2, isJoined: false },
-];
+export interface GuildMember {
+  id: string;
+  nickname: string;
+  weeklyMinutes: number;
+  totalMinutes: number;
+  grade: 'guild_master' | 'officer' | 'member';
+}
+
+export interface PartyMember {
+  id: string;
+  nickname: string;
+  weeklyMinutes: number;
+  role: 'LEADER' | 'MEMBER';
+}
 
 interface SocialState {
   parties: Party[];
   currentParty: Party | null;
   currentPartyId: string | null;
+  currentPartyMembers: PartyMember[];
   guilds: Guild[];
   currentGuildId: string | null;
+  currentGuildMembers: GuildMember[];
   pollingIntervalId: number | null;
 
   loadMyParty: () => Promise<void>;
+  loadPartyMembers: (partyId: string) => Promise<void>;
   createParty: (partyInput: { name: string; description: string; maxMembers: number; weeklyMinutes: number; tags: string[] }) => Promise<void>;
   joinParty: (id: string) => Promise<void>;
   joinPartyByInvite: (inviteCode: string) => Promise<void>;
@@ -50,9 +61,11 @@ interface SocialState {
   stopPollingPartyProgress: () => void;
   completePartyQuest: (questId: string, rewards: { gold: number; gems: number; colStat: number }) => Promise<void>;
 
-  joinGuild: (id: string) => void;
-  leaveGuild: () => void;
-  createGuild: (g: Omit<Guild, 'id' | 'isJoined' | 'memberCount'>) => void;
+  loadGuilds: () => Promise<void>;
+  loadMyGuild: () => Promise<void>;
+  joinGuild: (id: string) => Promise<void>;
+  leaveGuild: () => Promise<void>;
+  createGuild: (g: { name: string; description: string; maxMembers: number }) => Promise<void>;
 }
 
 export const useSocialStore = create<SocialState>()(
@@ -61,8 +74,10 @@ export const useSocialStore = create<SocialState>()(
       parties: [],
       currentParty: null,
       currentPartyId: null,
-      guilds: MOCK_GUILDS,
+      currentPartyMembers: [],
+      guilds: [],
       currentGuildId: null,
+      currentGuildMembers: [],
       pollingIntervalId: null,
 
       loadMyParty: async () => {
@@ -85,13 +100,34 @@ export const useSocialStore = create<SocialState>()(
               parties: [mappedParty]
             });
             get().startPollingPartyProgress();
+            get().loadPartyMembers(serverParty.id);
           } else {
-            set({ currentPartyId: null, currentParty: null });
+            set({ currentPartyId: null, currentParty: null, currentPartyMembers: [] });
             get().stopPollingPartyProgress();
           }
         } catch {
-          set({ currentPartyId: null, currentParty: null });
+          set({ currentPartyId: null, currentParty: null, currentPartyMembers: [] });
         }
+      },
+
+      loadPartyMembers: async (partyId: string) => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/parties/${partyId}/members`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          set({
+            currentPartyMembers: data.map((m: any) => ({
+              id: m.user_id,
+              nickname: m.nickname,
+              weeklyMinutes: m.weekly_minutes,
+              role: m.role,
+            })),
+          });
+        } catch (e) { console.error('파티 멤버 로드 실패:', e); }
       },
 
       createParty: async (partyInput) => {
@@ -114,6 +150,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [newParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { alert(e.message || '파티 생성 실패'); }
       },
 
@@ -146,6 +183,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [mappedParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { alert(e.message); throw e; }
       },
 
@@ -168,6 +206,7 @@ export const useSocialStore = create<SocialState>()(
             parties: [mappedParty]
           });
           get().startPollingPartyProgress();
+          get().loadPartyMembers(serverParty.id);
         } catch (e: any) { throw e; }
       },
 
@@ -202,6 +241,7 @@ export const useSocialStore = create<SocialState>()(
                   weeklyMinutes: serverParty.weekly_minutes || get().currentParty!.weeklyMinutes,
                 }
               });
+              get().loadPartyMembers(partyId);
             }
           } catch { console.warn('폴링 동기화 실패'); }
         }, 10000);
@@ -230,34 +270,133 @@ export const useSocialStore = create<SocialState>()(
         } catch (e) { console.error('보상 지급 동기화 실패:', e); }
       },
 
-      joinGuild: (id) =>
-        set((state) => ({
-          currentGuildId: id,
-          guilds: state.guilds.map((g) =>
-            g.id === id ? { ...g, isJoined: true, memberCount: g.memberCount + 1 } : g
-          ),
-        })),
-      leaveGuild: () =>
-        set((state) => ({
-          currentGuildId: null,
-          guilds: state.guilds.map((g) =>
-            g.id === state.currentGuildId ? { ...g, isJoined: false, memberCount: Math.max(0, g.memberCount - 1) } : g
-          ),
-        })),
-      createGuild: (g) =>
-        set((state) => {
-          const newGuild: Guild = { ...g, id: `g${Date.now()}`, isJoined: true, memberCount: 1 };
-          return { guilds: [...state.guilds, newGuild], currentGuildId: newGuild.id };
-        }),
+      loadGuilds: async () => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/guilds`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const currentGuildId = get().currentGuildId;
+          set({
+            guilds: data.map((g: any) => ({
+              id: g.id, name: g.name, description: g.description ?? '',
+              memberCount: g.member_count, maxMembers: g.max_members,
+              weeklyMinutes: g.weekly_minutes, level: g.level,
+              isJoined: g.id === currentGuildId,
+            })),
+          });
+        } catch (e) { console.error('길드 목록 로드 실패:', e); }
+      },
+
+      loadMyGuild: async () => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/guilds/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.status === 404) { set({ currentGuildId: null, currentGuildMembers: [] }); return; }
+          if (!res.ok) return;
+          const g = await res.json();
+          set({
+            currentGuildId: g.id,
+            currentGuildMembers: (g.members ?? []).map((m: any) => ({
+              id: m.user_id, nickname: m.nickname, grade: m.grade,
+              weeklyMinutes: m.weekly_minutes, totalMinutes: m.total_minutes,
+            })),
+            guilds: get().guilds.map((gld) =>
+              gld.id === g.id
+                ? { ...gld, memberCount: g.member_count, weeklyMinutes: g.weekly_minutes, isJoined: true }
+                : gld
+            ),
+          });
+        } catch (e) { console.error('내 길드 로드 실패:', e); }
+      },
+
+      joinGuild: async (id) => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/guilds/${id}/join`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+          const g = await res.json();
+          set({
+            currentGuildId: g.id,
+            currentGuildMembers: (g.members ?? []).map((m: any) => ({
+              id: m.user_id, nickname: m.nickname, grade: m.grade,
+              weeklyMinutes: m.weekly_minutes, totalMinutes: m.total_minutes,
+            })),
+            guilds: get().guilds.map((gld) =>
+              gld.id === g.id ? { ...gld, memberCount: g.member_count, isJoined: true } : gld
+            ),
+          });
+        } catch (e: any) { alert(e.message || '길드 가입 실패'); throw e; }
+      },
+
+      leaveGuild: async () => {
+        const guildId = get().currentGuildId;
+        if (!guildId) return;
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/guilds/${guildId}/members/me`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+          set({
+            currentGuildId: null,
+            currentGuildMembers: [],
+            guilds: get().guilds.map((g) =>
+              g.id === guildId ? { ...g, isJoined: false, memberCount: Math.max(0, g.memberCount - 1) } : g
+            ),
+          });
+        } catch (e: any) { alert(e.message || '길드 탈퇴 실패'); throw e; }
+      },
+
+      createGuild: async (input) => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+          const res = await fetch(`${API_BASE_URL}/api/v1/guilds`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: input.name, description: input.description, max_members: input.maxMembers }),
+          });
+          if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+          const g = await res.json();
+          const newGuild: Guild = {
+            id: g.id, name: g.name, description: g.description ?? '',
+            memberCount: g.member_count, maxMembers: g.max_members,
+            weeklyMinutes: g.weekly_minutes, level: g.level, isJoined: true,
+          };
+          set({
+            currentGuildId: g.id,
+            currentGuildMembers: (g.members ?? []).map((m: any) => ({
+              id: m.user_id, nickname: m.nickname, grade: m.grade,
+              weeklyMinutes: m.weekly_minutes, totalMinutes: m.total_minutes,
+            })),
+            guilds: [...get().guilds, newGuild],
+          });
+        } catch (e: any) { alert(e.message || '길드 생성 실패'); throw e; }
+      },
     }),
     { 
       name: 'social-store', 
       partialize: (state) => ({ 
         parties: state.parties,
-        currentPartyId: state.currentPartyId, 
-        currentParty: state.currentParty, 
-        guilds: state.guilds, 
-        currentGuildId: state.currentGuildId
+        currentPartyId: state.currentPartyId,
+        currentParty: state.currentParty,
+        currentPartyMembers: state.currentPartyMembers,
+        guilds: state.guilds,
+        currentGuildId: state.currentGuildId,
+        currentGuildMembers: state.currentGuildMembers
       } as any)
     }
   )

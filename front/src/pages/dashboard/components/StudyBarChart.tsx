@@ -1,44 +1,50 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { useStudyStore } from '@/store/useStudyStore';
 
 interface DayData {
   label: string;
   minutes: number;
 }
 
-const MOCK_7: DayData[] = [
-  { label: '월', minutes: 120 },
-  { label: '화', minutes: 45 },
-  { label: '수', minutes: 0 },
-  { label: '목', minutes: 90 },
-  { label: '금', minutes: 150 },
-  { label: '토', minutes: 60 },
-  { label: '일', minutes: 30 },
-];
+const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
-const MOCK_7_PREV: DayData[] = [
-  { label: '월', minutes: 90 },
-  { label: '화', minutes: 60 },
-  { label: '수', minutes: 30 },
-  { label: '목', minutes: 120 },
-  { label: '금', minutes: 80 },
-  { label: '토', minutes: 45 },
-  { label: '일', minutes: 20 },
-];
+function buildWeekData(sessions: { date: string; durationMinutes: number }[], mondayStr: string): DayData[] {
+  const result: DayData[] = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mondayStr);
+    d.setDate(d.getDate() + i);
+    return { label: DAY_LABELS[d.getDay()], minutes: 0 };
+  });
+  sessions.forEach((s) => {
+    const d = new Date(s.date);
+    const base = new Date(mondayStr);
+    const diff = Math.round((d.getTime() - base.getTime()) / 86400000);
+    if (diff >= 0 && diff < 7) result[diff].minutes += s.durationMinutes;
+  });
+  return result;
+}
 
-const MOCK_30_RAW = [90,60,120,0,80,150,45,30,110,75,0,90,60,120,45,80,150,30,60,90,120,0,75,45,90,150,60,30,45,120];
-const MOCK_30_PREV_RAW = [70,50,100,20,60,120,30,40,90,60,10,70,50,100,30,60,120,20,50,80,100,10,60,30,70,120,50,20,30,90];
-const MOCK_30: DayData[] = MOCK_30_RAW.map((m, i) => ({
-  label: ['월','화','수','목','금','토','일'][i % 7],
-  minutes: m,
-}));
+function buildMonthData(sessions: { date: string; durationMinutes: number }[], startStr: string): DayData[] {
+  const result: DayData[] = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(startStr);
+    d.setDate(d.getDate() + i);
+    return { label: DAY_LABELS[d.getDay()], minutes: 0 };
+  });
+  sessions.forEach((s) => {
+    const d = new Date(s.date);
+    const base = new Date(startStr);
+    const diff = Math.round((d.getTime() - base.getTime()) / 86400000);
+    if (diff >= 0 && diff < 30) result[diff].minutes += s.durationMinutes;
+  });
+  return result;
+}
 
-const TODAY_MINUTES = MOCK_7[MOCK_7.length - 1].minutes;
-const WEEK_MINUTES = MOCK_7.reduce((s, d) => s + d.minutes, 0);
-const MONTH_MINUTES = MOCK_30_RAW.reduce((s, m) => s + m, 0);
-
-const PREV_WEEK_MINUTES = MOCK_7_PREV.reduce((s, d) => s + d.minutes, 0);
-const PREV_MONTH_MINUTES = MOCK_30_PREV_RAW.reduce((s, m) => s + m, 0);
+function getMondayStr(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
+  return d.toISOString().slice(0, 10);
+}
 
 function calcGrowth(current: number, prev: number): number {
   if (prev === 0) return 0;
@@ -55,6 +61,7 @@ const SVG_H = 160;
 type Period = '7일' | '30일';
 
 const StudyBarChart: React.FC = () => {
+  const sessions = useStudyStore((s) => s.sessions);
   const [period, setPeriod] = useState<Period>('7일');
   const [mounted, setMounted] = useState(false);
 
@@ -69,7 +76,24 @@ const StudyBarChart: React.FC = () => {
     setTimeout(() => setMounted(true), 80);
   };
 
-  const data = period === '7일' ? MOCK_7 : MOCK_30;
+  const today = new Date().toISOString().slice(0, 10);
+  const thisMonday = getMondayStr(today);
+  const prevMonday = (() => { const d = new Date(thisMonday); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const monthStart = (() => { const d = new Date(today); d.setDate(d.getDate() - 29); return d.toISOString().slice(0, 10); })();
+  const prevMonthStart = (() => { const d = new Date(monthStart); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); })();
+
+  const week7 = useMemo(() => buildWeekData(sessions, thisMonday), [sessions, thisMonday]);
+  const week7prev = useMemo(() => buildWeekData(sessions, prevMonday), [sessions, prevMonday]);
+  const month30 = useMemo(() => buildMonthData(sessions, monthStart), [sessions, monthStart]);
+  const month30prev = useMemo(() => buildMonthData(sessions, prevMonthStart), [sessions, prevMonthStart]);
+
+  const todayMinutes = sessions.filter((s) => s.date === today).reduce((a, s) => a + s.durationMinutes, 0);
+  const weekMinutes = week7.reduce((a, d) => a + d.minutes, 0);
+  const monthMinutes = month30.reduce((a, d) => a + d.minutes, 0);
+  const prevWeekMinutes = week7prev.reduce((a, d) => a + d.minutes, 0);
+  const prevMonthMinutes = month30prev.reduce((a, d) => a + d.minutes, 0);
+
+  const data = period === '7일' ? week7 : month30;
   const count = data.length;
   const availW = SVG_W - LEFT_PAD - RIGHT_PAD;
   const slotW = availW / count;
@@ -77,8 +101,8 @@ const StudyBarChart: React.FC = () => {
   const maxMin = Math.max(...data.map((d) => d.minutes), 1);
   const barBase = TOP_PAD + CHART_H;
 
-  const currentTotal = period === '7일' ? WEEK_MINUTES : MONTH_MINUTES;
-  const prevTotal = period === '7일' ? PREV_WEEK_MINUTES : PREV_MONTH_MINUTES;
+  const currentTotal = period === '7일' ? weekMinutes : monthMinutes;
+  const prevTotal = period === '7일' ? prevWeekMinutes : prevMonthMinutes;
   const growth = calcGrowth(currentTotal, prevTotal);
 
   const yLabels = [
@@ -203,9 +227,9 @@ const StudyBarChart: React.FC = () => {
       {/* Summary row */}
       <div className="grid grid-cols-3 gap-2 mt-2">
         {[
-          { label: '오늘', value: `${TODAY_MINUTES}분` },
-          { label: '이번주', value: `${WEEK_MINUTES}분` },
-          { label: '이번달', value: `${MONTH_MINUTES}분` },
+          { label: '오늘', value: `${todayMinutes}분` },
+          { label: '이번주', value: `${weekMinutes}분` },
+          { label: '이번달', value: `${monthMinutes}분` },
         ].map((stat) => (
           <div key={stat.label} className="bg-foreground/5 rounded-xl p-2.5 text-center border border-border">
             <div className="text-foreground text-sm font-black">{stat.value}</div>

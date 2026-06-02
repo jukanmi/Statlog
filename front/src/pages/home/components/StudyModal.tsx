@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useStudyStore } from '@/store/useStudyStore';
 import { useUserStore } from '@/store/useUserStore';
-import { generateQuiz } from '@/lib/api';
+import { generateQuiz, saveStudySessionWithStats } from '@/lib/api';
 import type { StudySession } from '@/types';
 import type { Quiz } from '@/lib/api';
 import { Loader2, Lightbulb } from 'lucide-react';
@@ -50,14 +50,28 @@ const StudyModal: React.FC<StudyModalProps> = ({
   // --- 낙관적 업데이트를 적용한 Mutation ---
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // 퀴즈 생성 (stats는 StatUpdateScreen에서 별도 계산)
+      const date = new Date().toISOString().split('T')[0];
+      const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+
+      // Step 0: 학습 데이터 추출 중 (onMutate에서 이미 설정됨)
+      // Step 1: 6대 능력치 분석 중
+      setLoadingStep(1);
+      await saveStudySessionWithStats({ subject, content, durationMinutes, date, quizResults: [] })
+        .catch((e) => console.warn('세션 백엔드 저장 실패:', e));
+
+      // Step 2: 복습 퀴즈 생성 중
+      setLoadingStep(2);
       const aiQuiz = await generateQuiz(content);
+
+      // Step 3: 거의 다 되었어요
+      setLoadingStep(3);
+
       return { aiStats: null, aiQuiz };
     },
     
     // 1. Mutate 시작 시 호출 (낙관적 업데이트 로직)
     onMutate: async () => {
-      // 관련 쿼리 취소 (진행 중인게 있다면)
+      setLoadingStep(0);
       await queryClient.cancelQueries({ queryKey: ['study-history'] });
 
       // 이전 상태 스냅샷 저장 (롤백용)
@@ -142,21 +156,14 @@ const StudyModal: React.FC<StudyModalProps> = ({
   const isGenerating = saveMutation.isPending;
 
   useEffect(() => {
-    let interval: any;
     let tipInterval: any;
     if (isGenerating) {
-      setLoadingStep(0);
       setCurrentTip(getRandomTip());
-      interval = setInterval(() => {
-        setLoadingStep((prev) => (prev < loadingMessages.length - 1 ? prev + 1 : prev));
-      }, 2500);
-
       tipInterval = setInterval(() => {
         setCurrentTip(getRandomTip());
       }, 5000);
     }
     return () => {
-      clearInterval(interval);
       clearInterval(tipInterval);
     };
   }, [isGenerating]);

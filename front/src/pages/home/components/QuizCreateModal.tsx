@@ -120,10 +120,10 @@ const QuizCreateModal: React.FC<QuizCreateModalProps> = ({ isOpen, onClose, onCr
     const createdAt = new Date().toISOString();
     const id = `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     if (quizType === 'multiple') {
-      addQuiz({ subject, type: 'multiple', question: question.trim(), options: options.map((o) => o.trim()), correctIndex: correctOptionIndex! });
+      addQuiz({ id, subject, type: 'multiple', question: question.trim(), options: options.map((o) => o.trim()), correctIndex: correctOptionIndex! });
       saveQuizToServer({ id, subject, type: 'multiple', question: question.trim(), options: options.map((o) => o.trim()), correct_index: correctOptionIndex!, created_at: createdAt });
     } else {
-      addQuiz({ subject, type: 'short', question: question.trim(), answer: answer.trim(), hint: hint.trim() || undefined });
+      addQuiz({ id, subject, type: 'short', question: question.trim(), answer: answer.trim(), hint: hint.trim() || undefined });
       saveQuizToServer({ id, subject, type: 'short', question: question.trim(), answer: answer.trim(), hint: hint.trim() || undefined, created_at: createdAt });
     }
     onClose();
@@ -139,7 +139,7 @@ const QuizCreateModal: React.FC<QuizCreateModalProps> = ({ isOpen, onClose, onCr
       generatedQuizzes.forEach((q) => {
         const id = `uq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const createdAt = new Date().toISOString();
-        addQuiz({ subject, type: 'multiple', question: q.question, options: q.options, correctIndex: q.correctIndex });
+        addQuiz({ id, subject, type: 'multiple', question: q.question, options: q.options, correctIndex: q.correctIndex });
         saveQuizToServer({ id, subject, type: 'multiple', question: q.question, options: q.options, correct_index: q.correctIndex, created_at: createdAt });
       });
       onClose();

@@ -71,51 +71,6 @@ def save_refresh_token(db: Session, user_id: str, token_hash: str, expires_at: d
 Provider = Literal["kakao", "google"]
 
 
-class DevLoginRequest(BaseModel):
-    user_id: str
-    nickname: str
-
-
-@router.post("/dev-login")
-async def dev_login(body: DevLoginRequest):
-    """
-    개발용 로그인 API
-
-    로컬 개발 및 Swagger 테스트를 위해 토큰을 강제로 발급합니다.
-    """
-    # TODO: DB 연동 후 실제 DB에 유저가 없으면 생성, 있으면 조회하는 로직으로 교체해야 합니다.
-    # 예: user, created = await get_or_create_user(body.user_id, body.nickname)
-
-    access_token = create_access_token(user_id=body.user_id)
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
-
-
-async def get_or_create_user_from_oauth(oauth_user: dict):
-    """실제 DB 연동 전까지 사용할 가짜 유저 생성/조회 함수"""
-    # dummy user object
-    class DummyUser:
-        def __init__(self):
-            self.id = "user-001"
-            self.nickname = oauth_user.get("nickname", "탐험가")
-            self.email = oauth_user.get("email")
-            self.profile_image = oauth_user.get("profile_image")
-            self.stats = {"HUM": 50, "SOC": 0, "NAT": 10, "COL": 0, "PER": 0, "ART": 0}
-            self.gold = 1000
-            self.gems = 50
-            self.level = 1
-            self.exp = 0
-
-    return DummyUser(), True
-
-
-async def save_refresh_token(user_id: str, token_hash: str, expires_at: datetime):
-    """실제 DB 연동 전까지 사용할 가짜 리프레시 토큰 저장 함수"""
-    logger.info("Mock save_refresh_token: user_id=%s", user_id)
-    pass
-
 
 @router.get("/{provider}/url", response_model=OAuthUrlResponse)
 async def get_oauth_url(
