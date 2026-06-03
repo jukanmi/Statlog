@@ -113,7 +113,19 @@ const PartySubScreen: React.FC = () => {
           onCopyInvite={async () => {
             const url = `${window.location.origin}?join=${currentParty.id}`;
             try {
-              await navigator.clipboard.writeText(url);
+              if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+              } else {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              }
               showToast('초대 링크가 복사됐어요!');
             } catch {
               showToast('링크 복사에 실패했어요');
