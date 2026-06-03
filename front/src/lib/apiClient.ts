@@ -25,7 +25,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   const token = localStorage.getItem('access_token');
   
-  const isAiEndpoint = endpoint.startsWith('/api/v1/ai/') || endpoint.includes('/portfolio/');
+  const isAiEndpoint = endpoint.startsWith('/api/v1/ai/') || endpoint.includes('/portfolio/') || endpoint.startsWith('/api/v1/study/');
   const timeoutMs = isAiEndpoint ? 120000 : 15000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

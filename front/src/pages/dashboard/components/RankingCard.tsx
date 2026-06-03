@@ -34,7 +34,7 @@ const RankingCard: React.FC = () => {
   useEffect(() => {
     // 컴포넌트 구동 시 정의된 카테고리별 상위 N% 랭킹 분석 API 실시간 병렬 호출
     CATEGORIES.forEach((cat) => {
-      loadRankings(cat.category).catch((err) =>
+      loadRankings(cat.statKey).catch((err) =>
         console.warn(`${cat.category} 원격 데이터 동기화 대기:`, err)
       );
     });
@@ -60,7 +60,7 @@ const RankingCard: React.FC = () => {
           const stat = stats[cat.statKey] ?? 0;
 
           // 전역 스토어 캐시풀에서 해당 카테고리의 랭킹 목록 스냅샷 조회
-          const serverRankList = rankingsByCategory[cat.category];
+          const serverRankList = rankingsByCategory[cat.statKey];
           // 실시간 응답 리스트 내부에서 내 아이디와 일치하는 실시간 랭크 지표 매핑 검색
           const myLiveRankData = serverRankList?.find((item) => item.userId === user.id);
 

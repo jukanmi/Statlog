@@ -47,25 +47,31 @@ class _PortfolioPDF(FPDF):
             )
 
     def kfont(self, size: int, bold: bool = False) -> None:
-        """한글 가능 폰트(또는 폴백)를 지정한다."""
         if self._has_kr:
             self.set_font(_FONT_NAME, "B" if bold else "", size)
         else:
             self.set_font("Helvetica", "B" if bold else "", size)
 
+    def s(self, text: str) -> str:
+        """한글 폰트 없으면 ASCII 대체 — Helvetica 인코딩 오류 방지."""
+        if self._has_kr:
+            return text
+        return text.encode("ascii", errors="replace").decode("ascii")
+
 
 def _section_title(pdf: _PortfolioPDF, text: str) -> None:
     pdf.ln(3)
-    pdf.set_text_color(201, 168, 76)  # 골드 액센트
+    pdf.set_text_color(201, 168, 76)
     pdf.kfont(13, bold=True)
-    pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, pdf.s(text), new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(30, 30, 40)
 
 
 def _bullet_list(pdf: _PortfolioPDF, items: list[str]) -> None:
     pdf.kfont(11)
     for item in items:
-        pdf.multi_cell(0, 7, f"- {item}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 7, pdf.s(f"- {item}"), new_x="LMARGIN", new_y="NEXT")
+
 
 
 def render_portfolio_pdf(
@@ -86,12 +92,12 @@ def render_portfolio_pdf(
     # --- 헤더 ---
     pdf.set_text_color(30, 30, 40)
     pdf.kfont(20, bold=True)
-    pdf.cell(0, 12, f"{nickname} 님의 학습 포트폴리오", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 12, pdf.s(f"{nickname} 님의 학습 포트폴리오"), new_x="LMARGIN", new_y="NEXT")
     pdf.kfont(10)
     pdf.set_text_color(120, 120, 130)
     pdf.cell(
         0, 6,
-        f"Lv.{level}  |  EXP {exp}  |  생성일 {date.today().isoformat()}",
+        pdf.s(f"Lv.{level}  |  EXP {exp}  |  {date.today().isoformat()}"),
         new_x="LMARGIN", new_y="NEXT",
     )
     pdf.set_text_color(30, 30, 40)
@@ -99,7 +105,7 @@ def render_portfolio_pdf(
     # --- 요약 ---
     _section_title(pdf, "요약")
     pdf.kfont(11)
-    pdf.multi_cell(0, 7, payload.summary, new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(0, 7, pdf.s(payload.summary), new_x="LMARGIN", new_y="NEXT")
 
     # --- 6대 능력치 ---
     _section_title(pdf, "능력치 (AI 분석)")
@@ -107,9 +113,8 @@ def render_portfolio_pdf(
     for key in _STAT_KEYS:
         val = max(0, min(100, int(ai_stats.get(key, 0) or 0)))
         label = _STAT_LABELS[key]
-        pdf.cell(50, 7, f"{label} ({key})", border=0)
-        # 간단한 막대 + 수치
-        bar_w = min(val, 100) * 1.0  # 100% → 100mm
+        pdf.cell(50, 7, pdf.s(f"{label} ({key})"), border=0)
+        bar_w = min(val, 100) * 1.0
         y = pdf.get_y()
         x = pdf.get_x()
         pdf.set_fill_color(201, 168, 76)
@@ -127,7 +132,7 @@ def render_portfolio_pdf(
         ):
             hours = minutes / 60
             pdf.cell(
-                0, 7, f"- {subject}: {minutes}분 ({hours:.1f}시간)",
+                0, 7, pdf.s(f"- {subject}: {minutes}min ({hours:.1f}h)"),
                 new_x="LMARGIN", new_y="NEXT",
             )
 
@@ -142,7 +147,7 @@ def render_portfolio_pdf(
         pdf.kfont(11)
         for sa in payload.subject_analysis:
             pdf.multi_cell(
-                0, 7, f"[{sa.subject}] {sa.comment}",
+                0, 7, pdf.s(f"[{sa.subject}] {sa.comment}"),
                 new_x="LMARGIN", new_y="NEXT",
             )
 
@@ -155,7 +160,7 @@ def render_portfolio_pdf(
     if payload.keywords:
         _section_title(pdf, "키워드")
         pdf.kfont(11)
-        pdf.multi_cell(0, 7, "  ·  ".join(payload.keywords), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 7, pdf.s("  .  ".join(payload.keywords)), new_x="LMARGIN", new_y="NEXT")
 
     # fpdf2: output()은 bytearray 반환 → bytes로 변환
     return bytes(pdf.output())

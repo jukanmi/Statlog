@@ -45,8 +45,8 @@ class Settings:
         "GCP_QUIZ_ENDPOINT",
         GCP_AI_ENDPOINT.rsplit("/", 1)[0] + "/generate_quiz",
     )
-    MAX_RETRIES: int = 2  # GCP 연동/스키마 검증 실패 시 재요청 횟수 (최대 2회)
-    TIMEOUT: float = 30.0  # 스탯 변환 요청 타임아웃(초)
+    MAX_RETRIES: int = 1  # GCP 연동/스키마 검증 실패 시 재요청 횟수
+    TIMEOUT: float = float(os.getenv("STAT_TIMEOUT", "45"))  # 스탯 변환 요청 타임아웃(초)
     # 퀴즈 생성은 문항 3개를 만들어 스탯 변환보다 오래 걸린다 — 별도 타임아웃
     QUIZ_TIMEOUT: float = float(os.getenv("QUIZ_TIMEOUT", "90"))
     # 포트폴리오 생성 엔드포인트 — 기본값은 GCP_AI_ENDPOINT와 같은 호스트의 /generate_portfolio
