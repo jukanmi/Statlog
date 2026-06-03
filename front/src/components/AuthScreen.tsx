@@ -10,7 +10,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const handleLogin = async (provider: 'kakao' | 'google') => {
     try {
       localStorage.setItem('oauth_provider', provider);
-      const redirectUri = encodeURIComponent(window.location.origin + "/auth/callback");
+      const redirectUri = encodeURIComponent(
+        (import.meta.env.VITE_REDIRECT_BASE_URL || window.location.origin) + "/auth/callback"
+      );
       const res = await fetch(`${baseUrl}/api/v1/auth/${provider}/url?redirect_uri=${redirectUri}`);
       if (!res.ok) throw new Error('인증 URL을 가져오는데 실패했습니다.');
       const data = await res.json();

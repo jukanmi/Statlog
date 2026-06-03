@@ -25,7 +25,7 @@ const AuthCallback = () => {
     if (code) {
       apiClient.post<AuthResponse>(`/api/v1/auth/${provider}/callback`, {
         code,
-        redirect_uri: window.location.origin + '/auth/callback',
+        redirect_uri: (import.meta.env.VITE_REDIRECT_BASE_URL || window.location.origin) + '/auth/callback',
         state: stateParam,
       })
         .then((data) => {
