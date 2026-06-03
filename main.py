@@ -59,6 +59,8 @@ app.add_middleware(
         "http://localhost:8080",
         "http://localhost:3000",
         "http://54.180.155.190:8080",
+        "http://statlog.statlog.kro.kr:8080",
+        "http://statlog.statlog.kro.kr",
     ],
     allow_credentials=True,
     allow_methods=["*"],

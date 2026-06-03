@@ -9,12 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 가상환경 파이썬 선택 — Unix는 .venv/bin, Windows(git-bash)는 .venv/Scripts.
-if [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then
-  VENV_PY="$SCRIPT_DIR/.venv/bin/python"
-elif [ -x "$SCRIPT_DIR/.venv/Scripts/python.exe" ]; then
-  VENV_PY="$SCRIPT_DIR/.venv/Scripts/python.exe"
+if [ -x "$SCRIPT_DIR/venv/bin/python" ]; then
+  VENV_PY="$SCRIPT_DIR/venv/bin/python"
+elif [ -x "$SCRIPT_DIR/venv/Scripts/python.exe" ]; then
+  VENV_PY="$SCRIPT_DIR/venv/Scripts/python.exe"
 else
-  echo "  [warn] .venv를 찾지 못해 시스템 python을 사용합니다."
+  echo "  [warn] venv를 찾지 못해 시스템 python을 사용합니다."
   VENV_PY="python"
 fi
 
