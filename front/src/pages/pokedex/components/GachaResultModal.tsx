@@ -60,12 +60,15 @@ const ResultCard: React.FC<ResultCardProps> = ({ character, isNew, revealed, del
           </div>
         )}
 
-        {/* Subject icon avatar */}
+        {/* Character image */}
         <div className={cn(
-          "rounded-full bg-white/5 flex items-center justify-center",
-          isLarge ? "w-20 h-20 text-4xl mt-6" : "w-12 h-12 text-2xl mt-4"
+          "rounded-full overflow-hidden bg-white/5 flex items-center justify-center",
+          isLarge ? "w-20 h-20 mt-6" : "w-12 h-12 mt-4"
         )}>
-          {icon}
+          {character.imageUrl
+            ? <img src={character.imageUrl} alt={character.name} className="w-full h-full object-cover" />
+            : <span className={isLarge ? "text-4xl" : "text-2xl"}>{icon}</span>
+          }
         </div>
 
         {/* Name */}

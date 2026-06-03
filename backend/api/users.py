@@ -70,7 +70,7 @@ async def update_me(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    allowed_fields = {"nickname", "profile_image"}
+    allowed_fields = {"nickname", "profile_image", "gold", "gems", "equipped_character_id", "owned_characters_bits", "level", "exp", "study_streak", "last_attendance_date"}
     for field, value in body.model_dump(exclude_none=True).items():
         if field in allowed_fields:
             setattr(current_user, field, value)
@@ -139,14 +139,19 @@ async def download_portfolio(
 
     payload = await AIService.request_portfolio_generation(log_text)
 
-    pdf_bytes = render_portfolio_pdf(
-        payload,
-        nickname=current_user.nickname,
-        level=int(current_user.level or 1),
-        exp=int(current_user.exp or 0),
-        ai_stats=stat_map,
-        subject_minutes=subject_minutes,
-    )
+    try:
+        pdf_bytes = render_portfolio_pdf(
+            payload,
+            nickname=current_user.nickname,
+            level=int(current_user.level or 1),
+            exp=int(current_user.exp or 0),
+            ai_stats=stat_map,
+            subject_minutes=subject_minutes,
+        )
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger("api.users").error("PDF 렌더링 실패: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail="PDF 생성 중 오류가 발생했습니다.")
 
     return Response(
         content=pdf_bytes,

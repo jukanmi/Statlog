@@ -88,12 +88,12 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
     setResult({ characters, newIds });
     setIsResultOpen(true);
 
-    const { ownedCharacterIds, equippedCharacterId, user } = useUserStore.getState();
+    const latestState = useUserStore.getState();
     syncUserToServer({
-      gold: user.gold,
-      gems: user.gems,
-      owned_characters_bits: encodeBitmask(ownedCharacterIds),
-      equipped_character_id: equippedCharacterId,
+      gold: latestState.user.gold,
+      gems: latestState.user.gems,
+      owned_characters_bits: encodeBitmask(latestState.ownedCharacterIds),
+      equipped_character_id: latestState.equippedCharacterId,
     });
   };
 
