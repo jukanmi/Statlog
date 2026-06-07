@@ -1,13 +1,30 @@
-import { useState } from 'react';
-import { Mail, Lock, Swords } from 'lucide-react';
+import { Swords } from 'lucide-react';
 
 interface AuthScreenProps {
   onLogin: () => void;
 }
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  const handleLogin = async (provider: 'kakao' | 'google') => {
+    try {
+      localStorage.setItem('oauth_provider', provider);
+      const redirectUri = encodeURIComponent(window.location.origin + "/auth/callback");
+      const res = await fetch(`${baseUrl}/api/v1/auth/${provider}/url?redirect_uri=${redirectUri}`);
+      if (!res.ok) throw new Error('인증 URL을 가져오는데 실패했습니다.');
+      const data = await res.json();
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
+      }
+    } catch (err) {
+      console.error(err);
+      alert('로그인 준비 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleKakaoLogin = () => handleLogin('kakao');
+  const handleGoogleLogin = () => handleLogin('google');
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -27,34 +44,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
         {/* Card */}
         <div className="bg-card rounded-lg border border-border p-6 space-y-5">
-          <div className="space-y-3">
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="email"
-                placeholder="이메일"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-background border border-border rounded-md py-3 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="password"
-                placeholder="비밀번호"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-background border border-border rounded-md py-3 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
-          </div>
-
           <button
-            onClick={onLogin}
-            className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-md text-sm hover:brightness-110 transition-all"
+            onClick={handleKakaoLogin}
+            className="w-full bg-[#FEE500] text-[#000000] font-semibold py-3 rounded-md text-sm hover:brightness-95 transition-all flex items-center justify-center gap-2"
           >
-            로그인
+            카카오 로그인
+          </button>
+          
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full bg-white text-black border border-gray-300 font-semibold py-3 rounded-md text-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+          >
+            구글 로그인
           </button>
 
           <div className="relative">

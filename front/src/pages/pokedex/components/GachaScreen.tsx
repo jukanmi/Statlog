@@ -1,40 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { pullOne, pullTen, type GachaCharacter } from '@/lib/gachaSystem';
+import { pullOne, pullTen } from '@/lib/gachaService';
+import { type Character } from '@/types';
+import { syncUserToServer, encodeBitmask } from '@/lib/api';
 import GachaResultModal from './GachaResultModal';
+import { cn } from '@/lib/utils';
 
 interface GachaScreenProps {
   onViewCollection: () => void;
 }
 
 const MysteryFigure: React.FC = () => (
-  <svg width="100" height="130" viewBox="0 0 100 130" style={{ display: 'block' }}>
+  <svg width="100" height="130" viewBox="0 0 100 130" className="block">
     {/* Sparkles */}
-    <circle cx="10" cy="14" r="4" fill="rgba(201,168,76,0.4)" />
-    <circle cx="88" cy="8"  r="3" fill="rgba(201,168,76,0.3)" />
-    <circle cx="96" cy="65" r="4" fill="rgba(201,168,76,0.35)" />
-    <circle cx="84" cy="120" r="3" fill="rgba(201,168,76,0.25)" />
-    <circle cx="16" cy="118" r="4" fill="rgba(201,168,76,0.35)" />
-    <circle cx="4"  cy="55"  r="3" fill="rgba(201,168,76,0.3)" />
-    {/* Head */}
-    <circle cx="50" cy="22" r="18" fill="rgba(255,255,255,0.06)" />
-    {/* Neck */}
-    <rect x="44" y="38" width="12" height="8" rx="4" fill="rgba(255,255,255,0.06)" />
-    {/* Body */}
-    <rect x="27" y="44" width="46" height="42" rx="9" fill="rgba(255,255,255,0.06)" />
-    {/* Left arm */}
-    <rect x="7"  y="48" width="18" height="12" rx="6" fill="rgba(255,255,255,0.06)" />
-    {/* Right arm */}
-    <rect x="75" y="48" width="18" height="12" rx="6" fill="rgba(255,255,255,0.06)" />
-    {/* Left leg */}
-    <rect x="29" y="84" width="16" height="38" rx="7" fill="rgba(255,255,255,0.06)" />
-    {/* Right leg */}
-    <rect x="55" y="84" width="16" height="38" rx="7" fill="rgba(255,255,255,0.06)" />
+    <circle cx="10" cy="14" r="4" fill="#C9A84C" className="opacity-40 animate-pulse" />
+    <circle cx="88" cy="8"  r="3" fill="#C9A84C" className="opacity-30 animate-pulse [animation-delay:1s]" />
+    <circle cx="96" cy="65" r="4" fill="#C9A84C" className="opacity-35 animate-pulse [animation-delay:0.5s]" />
+    <circle cx="84" cy="120" r="3" fill="#C9A84C" className="opacity-25 animate-pulse [animation-delay:1.5s]" />
+    <circle cx="16" cy="118" r="4" fill="#C9A84C" className="opacity-35 animate-pulse [animation-delay:0.8s]" />
+    <circle cx="4"  cy="55"  r="3" fill="#C9A84C" className="opacity-30 animate-pulse [animation-delay:1.2s]" />
+    {/* Silhouette - Optimized with Tailwind colors */}
+    <g className="fill-white/10 blur-[1px]">
+      <circle cx="50" cy="22" r="18" />
+      <rect x="44" y="38" width="12" height="8" rx="4" />
+      <rect x="27" y="44" width="46" height="42" rx="9" />
+      <rect x="7"  y="48" width="18" height="12" rx="6" />
+      <rect x="75" y="48" width="18" height="12" rx="6" />
+      <rect x="29" y="84" width="16" height="38" rx="7" />
+      <rect x="55" y="84" width="16" height="38" rx="7" />
+    </g>
   </svg>
 );
 
 interface GachaResult {
-  characters: GachaCharacter[];
+  characters: Character[];
   newIds: Set<string>;
 }
 
@@ -48,6 +47,7 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
   const [result, setResult] = useState<GachaResult | null>(null);
   const [isResultOpen, setIsResultOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<'gems' | 'gold'>('gems');
 
   useEffect(() => {
     if (toast) {
@@ -56,15 +56,27 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
     }
   }, [toast]);
 
-  const handlePull = (count: 1 | 10) => {
-    const cost = count === 1 ? 10 : 90;
-    if (gems < cost) {
-      setToast('소환석이 부족해요 💎');
-      return;
-    }
+  const GEM_COSTS = { single: 10, ten: 90 };
+  const GOLD_COSTS = { single: 500, ten: 4500 };
 
+  const handlePull = (count: 1 | 10) => {
     const prevOwned = new Set(ownedCharacterIds);
-    updateCurrency(undefined, gems - cost);
+
+    if (currency === 'gems') {
+      const cost = count === 1 ? GEM_COSTS.single : GEM_COSTS.ten;
+      if (gems < cost) {
+        setToast('소환석이 부족해요 💎');
+        return;
+      }
+      updateCurrency(undefined, gems - cost);
+    } else {
+      const cost = count === 1 ? GOLD_COSTS.single : GOLD_COSTS.ten;
+      if (gold < cost) {
+        setToast('골드가 부족해요 🪙');
+        return;
+      }
+      updateCurrency(gold - cost, undefined);
+    }
 
     const characters = count === 1 ? [pullOne()] : pullTen();
     characters.forEach((c) => addCharacter(c.id));
@@ -75,210 +87,108 @@ const GachaScreen: React.FC<GachaScreenProps> = ({ onViewCollection }) => {
 
     setResult({ characters, newIds });
     setIsResultOpen(true);
+
+    const latestState = useUserStore.getState();
+    syncUserToServer({
+      gold: latestState.user.gold,
+      gems: latestState.user.gems,
+      owned_characters_bits: encodeBitmask(latestState.ownedCharacterIds),
+      equipped_character_id: latestState.equippedCharacterId,
+    });
   };
 
-  const handleClose = () => {
-    setIsResultOpen(false);
-  };
+  const handleClose = () => setIsResultOpen(false);
 
   const handleViewCollection = () => {
     setIsResultOpen(false);
     onViewCollection();
   };
 
-  const goldFormatted = gold.toLocaleString();
-
   return (
-    <div
-      style={{
-        minHeight: 'calc(100dvh - 100px)',
-        backgroundColor: '#0F0F1A',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '32px 20px calc(90px + env(safe-area-inset-bottom))',
-        position: 'relative',
-        gap: 28,
-      }}
-    >
+    <div className="min-h-[calc(100dvh-100px)] bg-background flex flex-col items-center p-8 px-5 pb-[calc(90px+env(safe-area-inset-bottom))] relative gap-7">
       {/* Ambient glow */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '45%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 400,
-          height: 400,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }}
-      />
+      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.08)_0%,transparent_70%)] pointer-events-none" />
 
       {/* Title */}
-      <div style={{ textAlign: 'center' }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF', margin: 0, marginBottom: 6 }}>
-          캐릭터 소환
-        </h2>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-          공부하면 소환석이 쌓여요
-        </p>
+      <div className="text-center">
+        <h2 className="text-[22px] font-bold text-foreground mb-1.5">캐릭터 소환</h2>
+        <p className="text-[13px] text-foreground/40">공부하면 소환석이 쌓여요</p>
+      </div>
+
+      {/* Currency type toggle */}
+      <div className="flex gap-1.5 bg-foreground/5 rounded-[20px] p-1">
+        {(['gems', 'gold'] as const).map((c) => (
+          <button
+            key={c}
+            onClick={() => setCurrency(c)}
+            className={cn(
+              "rounded-2xl px-4 py-1.5 text-[13px] font-semibold border-none cursor-pointer transition-all duration-200",
+              currency === c 
+                ? (c === 'gems' ? "bg-[#A78BFA] text-background" : "bg-[#C9A84C] text-background") 
+                : "bg-transparent text-foreground/40 hover:text-foreground/60"
+            )}
+          >
+            {c === 'gems' ? '💎 소환석' : '🪙 골드'}
+          </button>
+        ))}
       </div>
 
       {/* Currency row */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <div
-          style={{
-            backgroundColor: '#1A1A2E',
-            borderRadius: 20,
-            padding: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 14,
-            color: '#FFFFFF',
-            fontWeight: 600,
-          }}
-        >
+      <div className="flex gap-3 items-center">
+        <div className="bg-card rounded-[20px] px-4 py-2 flex items-center gap-1.5 text-sm text-foreground font-semibold shadow-inner border border-border">
           <span>💎</span>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{gems}</span>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>소환석</span>
+          <span className="tabular-nums">{gems}</span>
+          <span className="text-foreground/40 text-xs">소환석</span>
         </div>
-        <div
-          style={{
-            backgroundColor: '#1A1A2E',
-            borderRadius: 20,
-            padding: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 14,
-            color: '#FFFFFF',
-            fontWeight: 600,
-          }}
-        >
+        <div className="bg-card rounded-[20px] px-4 py-2 flex items-center gap-1.5 text-sm text-foreground font-semibold shadow-inner border border-border">
           <span>🪙</span>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{goldFormatted}</span>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>골드</span>
+          <span className="tabular-nums">{gold.toLocaleString()}</span>
+          <span className="text-foreground/40 text-xs">골드</span>
         </div>
       </div>
 
       {/* Gacha banner card */}
-      <div
-        style={{
-          width: 300,
-          height: 360,
-          background: 'linear-gradient(145deg, #1A1A2E, #2D1B69)',
-          border: '1px solid rgba(124,58,237,0.4)',
-          borderRadius: 20,
-          boxShadow: '0 0 40px rgba(124,58,237,0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '20px 16px 24px',
-          position: 'relative',
-          flexShrink: 0,
-        }}
-      >
-        {/* Rate badge */}
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
-          ★★★ S등급 확률 3%
-        </div>
-
-        {/* Silhouette */}
+      <div className="w-[300px] h-[360px] bg-gradient-to-br from-card to-[#2D1B69] border border-[#7C3AED]/40 rounded-[20px] shadow-[0_0_40px_rgba(124,58,237,0.2)] flex flex-col items-center justify-between p-5 pb-6 relative shrink-0">
+        <div className="text-[12px] text-white/35 text-center">★★★ S등급 확률 3%</div>
         <MysteryFigure />
-
-        {/* Mystery name */}
-        <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
-          ???
-        </div>
+        <div className="text-[18px] text-white/25 font-bold tracking-wider">???</div>
       </div>
 
       {/* Pull buttons */}
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div className="flex gap-3">
         <button
           onClick={() => handlePull(1)}
-          style={{
-            width: 140,
-            height: 48,
-            backgroundColor: 'transparent',
-            border: '1.5px solid #C9A84C',
-            borderRadius: 24,
-            color: '#FFFFFF',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            transition: 'background-color 150ms ease, transform 150ms ease',
-          }}
-          onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.96)'; }}
-          onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+          className={cn(
+            "w-[140px] h-12 bg-transparent border-[1.5px] rounded-[24px] text-foreground text-sm font-semibold cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95",
+            currency === 'gems' ? "border-[#A78BFA]" : "border-[#C9A84C]"
+          )}
         >
-          1회 소환 &nbsp;💎 10
+          {currency === 'gems' ? '1회 소환 💎 10' : '1회 소환 🪙 500'}
         </button>
 
         <button
           onClick={() => handlePull(10)}
-          style={{
-            width: 140,
-            height: 48,
-            backgroundColor: '#C9A84C',
-            border: 'none',
-            borderRadius: 24,
-            color: '#0F0F1A',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            boxShadow: '0 0 20px rgba(201,168,76,0.35)',
-            transition: 'transform 150ms ease',
-          }}
-          onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.96)'; }}
-          onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+          className={cn(
+            "w-[140px] h-12 border-none rounded-[24px] text-background text-sm font-bold cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95",
+            currency === 'gems' 
+              ? "bg-[#A78BFA] shadow-[0_0_20px_rgba(167,139,250,0.35)]" 
+              : "bg-[#C9A84C] shadow-[0_0_20px_rgba(201,168,76,0.35)]"
+          )}
         >
-          10회 소환 &nbsp;💎 90
+          {currency === 'gems' ? '10회 💎 90' : '10회 🪙 4,500'}
         </button>
       </div>
 
+      {currency === 'gold' && (
+        <div className="text-foreground/30 text-[11px] text-center">골드 소환은 소환석 소환과 동일 확률이에요</div>
+      )}
+
       {/* Toast */}
       {toast && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 'calc(88px + env(safe-area-inset-bottom))',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 300,
-            backgroundColor: 'rgba(239,68,68,0.15)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 24,
-            padding: '10px 20px',
-            color: '#FCA5A5',
-            fontSize: 14,
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-            animation: 'toastIn 200ms ease',
-          }}
-        >
+        <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[300] bg-red-500/15 backdrop-blur-md border border-red-500/30 rounded-[24px] px-5 py-2.5 text-[#FCA5A5] text-sm font-semibold whitespace-nowrap animate-in fade-in slide-in-from-bottom-2">
           {toast}
         </div>
       )}
-
-      <style>{`
-        @keyframes toastIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
 
       {/* Gacha result modal */}
       {result && (

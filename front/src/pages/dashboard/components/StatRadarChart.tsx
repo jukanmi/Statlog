@@ -1,14 +1,15 @@
 import { useUserStore } from '@/store/useUserStore';
-import type { Stats } from '@/types';
+import type { AIStats } from '@/types';
 
-type StatKey = keyof Stats;
+type StatKey = keyof AIStats;
 
-const STAT_KEYS: StatKey[] = ['INT', 'STR', 'END', 'AGI', 'CHA'];
-const ANGLES = [-90, -18, 54, 126, 198]; // degrees, starting from top, 72° apart
-const CENTER = 120;
+const STAT_KEYS: StatKey[] = ['HUM', 'SOC', 'NAT', 'COL', 'PER', 'ART', 'EXP'];
+// 7축, 위쪽(top)에서 시작
+const ANGLES = [-90, -38.57, 12.86, 64.29, 115.71, 167.14, 218.57];
+const CENTER = 130;
 const CHART_RADIUS = 80;
-const LABEL_RADIUS = 100;
-const SVG_SIZE = 240;
+const LABEL_RADIUS = 104;
+const SVG_SIZE = 260;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
@@ -33,14 +34,24 @@ const getLabelDy = (angle: number): number => {
   return 4;
 };
 
+const STAT_LABELS: Record<StatKey, string> = {
+  HUM: '인문학',
+  SOC: '사회과학',
+  NAT: '자연과학',
+  COL: '협동력',
+  PER: '끈기',
+  ART: '예체능',
+  EXP: '실행경험',
+};
+
 const StatRadarChart: React.FC = () => {
   const { user } = useUserStore();
-  const { stats } = user;
+  const { aiStats } = user;
 
-  const totalPts = STAT_KEYS.reduce((sum, key) => sum + stats[key], 0);
+  const totalPts = STAT_KEYS.reduce((sum, key) => sum + (aiStats[key] || 0), 0);
 
   const dataPoints = STAT_KEYS.map((key, i) =>
-    getPoint(ANGLES[i], (stats[key] / 100) * CHART_RADIUS)
+    getPoint(ANGLES[i], ((aiStats[key] || 0) / 100) * CHART_RADIUS)
   );
 
   const gridRings = [0.33, 0.66, 1.0];
@@ -54,7 +65,7 @@ const StatRadarChart: React.FC = () => {
         justifyContent: 'space-between',
         marginBottom: 8,
       }}>
-        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>나의 스탯</span>
+        <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>AI 분석 스탯</span>
         <span style={{
           background: 'rgba(201,168,76,0.1)',
           color: '#C9A84C',
@@ -63,27 +74,18 @@ const StatRadarChart: React.FC = () => {
           fontSize: 12,
           fontWeight: 600,
         }}>
-          {totalPts} pts
+          {totalPts}% total
         </span>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <svg
-          width={SVG_SIZE}
-          height={SVG_SIZE}
-          viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
-        >
+      <div className="flex justify-center mt-2">
+        <svg width={SVG_SIZE} height={SVG_SIZE} viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`} className="drop-shadow-2xl">
           {/* Background rings */}
           {gridRings.map((pct, i) => {
             const pts = ANGLES.map((a) => getPoint(a, CHART_RADIUS * pct));
             return (
-              <polygon
-                key={i}
-                points={toPoints(pts)}
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth={1}
-                fill="none"
-              />
+              <polygon key={i} points={toPoints(pts)}
+                className="stroke-foreground/10 fill-none" strokeWidth={1} />
             );
           })}
 
@@ -91,36 +93,20 @@ const StatRadarChart: React.FC = () => {
           {ANGLES.map((angle, i) => {
             const tip = getPoint(angle, CHART_RADIUS);
             return (
-              <line
-                key={i}
-                x1={CENTER}
-                y1={CENTER}
-                x2={tip.x.toFixed(2)}
-                y2={tip.y.toFixed(2)}
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={1}
-              />
+              <line key={i} x1={CENTER} y1={CENTER}
+                x2={tip.x.toFixed(2)} y2={tip.y.toFixed(2)}
+                className="stroke-foreground/10" strokeWidth={1} />
             );
           })}
 
-          {/* Data polygon fill */}
-          <polygon
-            points={toPoints(dataPoints)}
-            fill="rgba(201,168,76,0.2)"
-            stroke="#C9A84C"
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
+          {/* Data polygon */}
+          <polygon points={toPoints(dataPoints)}
+            className="fill-[#C9A84C]/20 stroke-[#C9A84C]"
+            strokeWidth={2.5} strokeLinejoin="round" />
 
           {/* Vertex dots */}
           {dataPoints.map((pt, i) => (
-            <circle
-              key={i}
-              cx={pt.x.toFixed(2)}
-              cy={pt.y.toFixed(2)}
-              r={4}
-              fill="#C9A84C"
-            />
+            <circle key={i} cx={pt.x.toFixed(2)} cy={pt.y.toFixed(2)} r={4} className="fill-[#C9A84C] shadow-lg" />
           ))}
 
           {/* Axis labels */}
@@ -133,7 +119,7 @@ const StatRadarChart: React.FC = () => {
                 key={key}
                 x={labelPt.x.toFixed(2)}
                 y={labelPt.y.toFixed(2)}
-                fontSize={11}
+                fontSize={10}
                 fill="rgba(255,255,255,0.5)"
               >
                 <tspan
@@ -145,11 +131,20 @@ const StatRadarChart: React.FC = () => {
                 </tspan>
                 <tspan
                   x={labelPt.x.toFixed(2)}
-                  dy={13}
+                  dy={12}
                   textAnchor={anchor}
                   fill="rgba(255,255,255,0.8)"
                 >
-                  {stats[key]}
+                  {aiStats[key] || 0}%
+                </tspan>
+                <tspan
+                  x={labelPt.x.toFixed(2)}
+                  dy={11}
+                  textAnchor={anchor}
+                  fontSize={8}
+                  fill="rgba(255,255,255,0.3)"
+                >
+                  {STAT_LABELS[key]}
                 </tspan>
               </text>
             );

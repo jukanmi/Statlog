@@ -1,58 +1,52 @@
 import { useState } from 'react';
 import GachaScreen from './components/GachaScreen';
 import CollectionScreen from './components/CollectionScreen';
+import { cn } from '@/lib/utils';
 
 type SubTab = 'gacha' | 'collection';
 
 const PokedexPage: React.FC = () => {
   const [subTab, setSubTab] = useState<SubTab>('gacha');
 
+  const tabs: { key: SubTab; label: string }[] = [
+    { key: 'gacha', label: '소환' },
+    { key: 'collection', label: '도감' },
+  ];
+
   return (
-    <div style={{ backgroundColor: '#0F0F1A', minHeight: '100dvh' }}>
+    <div className="bg-background min-h-[100dvh]">
       {/* Tab switcher */}
-      <div
-        style={{
-          backgroundColor: '#1A1A2E',
-          display: 'flex',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          paddingTop: 'env(safe-area-inset-top)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        {(['gacha', 'collection'] as SubTab[]).map((tab) => {
-          const isActive = subTab === tab;
+      <div className="bg-card/80 backdrop-blur-md flex border-b border-border pt-[env(safe-area-inset-top)] sticky top-0 z-50">
+        {tabs.map((tab) => {
+          const isActive = subTab === tab.key;
           return (
             <button
-              key={tab}
-              onClick={() => setSubTab(tab)}
-              style={{
-                flex: 1,
-                height: 48,
-                backgroundColor: 'transparent',
-                border: 'none',
-                borderBottom: isActive ? '2px solid #C9A84C' : '2px solid transparent',
-                color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)',
-                fontSize: 15,
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer',
-                transition: 'color 150ms ease, border-color 150ms ease',
-                marginBottom: -1,
-              }}
+              key={tab.key}
+              onClick={() => setSubTab(tab.key)}
+              className={cn(
+                "flex-1 h-12 bg-transparent border-none border-b-2 text-sm font-semibold transition-all duration-200 relative",
+                isActive 
+                  ? "text-foreground border-[#C9A84C]" 
+                  : "text-foreground/40 border-transparent hover:text-foreground/60"
+              )}
             >
-              {tab === 'gacha' ? '뽑기' : '도감'}
+              {tab.label}
+              {isActive && (
+                <div className="absolute inset-0 bg-[#C9A84C]/5 pointer-events-none" />
+              )}
             </button>
           );
         })}
       </div>
 
       {/* Content */}
-      {subTab === 'gacha' ? (
-        <GachaScreen onViewCollection={() => setSubTab('collection')} />
-      ) : (
-        <CollectionScreen />
-      )}
+      <div className="animate-in fade-in duration-500">
+        {subTab === 'gacha' ? (
+          <GachaScreen onViewCollection={() => setSubTab('collection')} />
+        ) : (
+          <CollectionScreen />
+        )}
+      </div>
     </div>
   );
 };
